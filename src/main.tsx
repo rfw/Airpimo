@@ -5,4 +5,5 @@ import './styles.css';
 import './styles/airpimo-home.css';
 import './styles/airpimo-dialogs.css';
 import './styles/airpimo-settings-tabs.css';
+import './styles/airpimo-v29-polish.css';
 createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);

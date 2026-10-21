@@ -16,7 +16,7 @@ test('fresh defaults enable tray, but legacy settings stay persisted and new UI 
   assert.match(read('src/domain/state.ts'),/stay_in_tray:true, theme:'system'/);
   assert.match(read('src-tauri/src/settings.rs'),/pub stay_in_tray: bool/);
   assert.match(read('src/App.tsx'),/checked=\{draft.stay_in_tray\}/);
-  assert.match(read('src/App.tsx'),/新安装默认开启，关闭主窗口后仍继续接收/);
+  assert.match(read('src/App.tsx'),/开启：关闭窗口后隐藏到托盘，继续接收。关闭：退出软件。/);
 });
 
 test('theme bootstrap runs before React and works for persisted dark, system dark and light',()=>{

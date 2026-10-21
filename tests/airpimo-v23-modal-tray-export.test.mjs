@@ -12,7 +12,8 @@ test('v23 has been applied completely and is idempotent',()=> {
 test('settings contains diagnostics, fills available window and preserves mac title header',()=> {
   const app=file('src/App.tsx'), css=file('src/styles/airpimo-dialogs.css');
   assert.match(app, /DialogContent className=\{`\$\{dialogClass\} airpimo-settings-dialog`\} overlayClassName=\{overlayClass\}/);
-  assert.equal((app.match(/<Dialog open=/g) ?? []).length, 1);
+  assert.equal((app.match(/<Dialog open=/g) ?? []).length, 2);
+  assert.match(app, /<Dialog open=\{updateNoticeOpen\}/);
   assert.match(app, /airpimo-panel-diagnostics/);
   assert.match(css, /\.airpimo-full-dialog\.is-macos\s*\{[^}]*top: 46px[^}]*height: calc\(100vh - 46px\)/);
   assert.match(css, /\.airpimo-modal-overlay\.is-macos\s*\{ top: 46px/);
