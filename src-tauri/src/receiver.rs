@@ -230,7 +230,18 @@ impl Controller {
         }
         self.publish(app);
     }
-    fn observe(&self, app:&AppHandle, epoch:u64, line:&str) {
+    fn observe(self: &Arc<Self>, app:&AppHandle, epoch:u64, line:&str) {
+        // The macOS title helper intercepts a user-initiated close before
+        // GStreamer destroys its GL surface. Stop this child through the
+        // controller instead of racing the active video-rendering thread.
+        if line.trim() == "AIRPIMO_PLAYER_WINDOW_HIDDEN" {
+            let allowed = {
+                let i = self.inner.lock().unwrap();
+                i.epoch == epoch && !i.stopping && i.child.is_some()
+            };
+            if allowed { self.stop(app); }
+            return;
+        }
         let observation=diagnostic::classify(line);
         if observation==Observation::None {return;}
         {

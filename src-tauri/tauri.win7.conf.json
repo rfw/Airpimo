@@ -1,7 +1,13 @@
 {
   "bundle": {
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "windows": {
+      "nsis": {
+        "installMode": "perMachine",
+        "startMenuFolder": "Airpimo"
+      },
       "webviewInstallMode": {
         "type": "fixedRuntime",
         "path": "./webview2-109"

@@ -51,7 +51,8 @@
     },
     "windows": {
       "nsis": {
-        "displayLanguageSelector": false
+        "displayLanguageSelector": false,
+        "startMenuFolder": "Airpimo"
       },
       "webviewInstallMode": {
         "type": "downloadBootstrapper"
