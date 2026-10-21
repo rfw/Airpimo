@@ -96,7 +96,9 @@ test('brightness is backed by real UxPlay -vc videobalance and retains Windows A
   assert.match(args,/videoconvert ! videobalance brightness=/);
   assert.match(args,/args\.push\("-vc"\.into\(\)\)/);
   assert.match(receiver,/applied_brightness: self\.applied_brightness/);
-  assert.match(receiver,/#\[cfg\(windows\)\]\s*command\.arg\("-avdec"\)/);
+  assert.match(args,/#\[cfg\(any\(windows, target_os = "macos"\)\)\]\s*push_default\(&mut args, &custom, "-avdec", None\);/);
+  assert.match(receiver,/let effective_args = match crate::uxplay_args::effective\(&name, fps, brightness, &user_args\)/);
+  assert.match(receiver,/command\.args\(&effective_args\)/);
   assert.match(settings,/serde\(default = "default_brightness"\)/);
   assert.match(settings,/pub const fn default_brightness\(\) -> u8 \{ 80 \}/);
   assert.match(app,/aria-label="画面亮度" type="range"/);

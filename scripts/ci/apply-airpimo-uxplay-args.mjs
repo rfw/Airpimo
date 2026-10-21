@@ -117,8 +117,8 @@ patch('tests/native-engine-integration.test.mjs', src=>{
     'assert.match(args,/videoconvert ! videobalance brightness=/);','brightness pipeline test');
   src=replace(src,'assert.match(receiver,/command\\.args\\(\\["-vc", converter\\.as_str\\(\\)\\]\\)/);',
     'assert.match(args,/args\\.push\\("-vc"\\.into\\(\\)\\)/);','brightness vc test');
-  src=replace(src,'assert.match(receiver,/#\\[cfg\\(windows\\)\\]\\s*command\\.arg\\("-avdec"\\)/);',
-    'assert.match(args,/cfg\\(any\\(windows, target_os = "macos"\\)\\)/);','brightness Win decode test');
+  src=replace(src,"assert.match(receiver,/#\\[cfg\\(windows\\)\\]\\s*command\\.arg\\(\"-avdec\"\\)/);",
+    "assert.match(args,/#\\[cfg\\(any\\(windows, target_os = \"macos\"\\)\\)\\]\\s*push_default\\(&mut args, &custom, \"-avdec\", None\\);/);\n  assert.match(receiver,/let effective_args = match crate::uxplay_args::effective\\(&name, fps, brightness, &user_args\\)/);\n  assert.match(receiver,/command\\.args\\(&effective_args\\)/);",'brightness Win decode test');
   return src;
 });
 // v25's historical ZIP checksum is not valid after a deliberate CSS extension.
