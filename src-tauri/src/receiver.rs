@@ -29,6 +29,7 @@ pub struct Snapshot {
     applied_device_name: Option<String>,
     applied_fps: Option<u16>,
     applied_brightness: Option<u8>,
+    applied_uxplay_args: Option<String>,
     process_running: bool,
     discovery_verified: bool,
     audio_verified: bool,
@@ -48,6 +49,7 @@ struct Inner {
     applied_device_name: Option<String>,
     applied_fps: Option<u16>,
     applied_brightness: Option<u8>,
+    applied_uxplay_args: Option<String>,
     connected_since: Option<u64>,
     started_at: Option<Instant>,
     connecting_at: Option<Instant>,
@@ -60,6 +62,7 @@ impl Inner {
             device_name: self.settings.device_name.clone(), applied_device_name: self.applied_device_name.clone(),
             applied_fps: self.applied_fps,
             applied_brightness: self.applied_brightness,
+            applied_uxplay_args: self.applied_uxplay_args.clone(),
             process_running: self.child.is_some(), discovery_verified: false, audio_verified: false,
             connected_since: self.connected_since, restart_attempts: self.restart_attempts,
             settings: self.settings.clone(),
@@ -78,7 +81,7 @@ impl Controller {
         if !valid { logs.push_back(format!("{} | invalid_settings_reset", unix_now())); }
         Arc::new(Self { inner: Mutex::new(Inner {
             settings, stage:"stopped", detail:"接收服务已停止".into(), issue:None, child:None,
-            epoch:0, stopping:true, restart_attempts:0, applied_device_name:None, applied_fps:None, applied_brightness:None,
+            epoch:0, stopping:true, restart_attempts:0, applied_device_name:None, applied_fps:None, applied_brightness:None, applied_uxplay_args:None,
             connected_since:None, started_at:None, connecting_at:None, logs,
         }), settings_path })
     }
@@ -93,6 +96,7 @@ impl Controller {
         settings::validate_name(&next.device_name)?;
         settings::validate_fps(next.fps)?;
         settings::validate_brightness(next.brightness)?;
+        crate::uxplay_args::validate(&next.uxplay_args)?;
         next.device_name = next.device_name.trim().to_string();
         // Disk write and state mutation share the same lock; concurrent IPC writes cannot race
         // against the same temporary filename or desynchronize saved/current settings.
@@ -112,7 +116,7 @@ impl Controller {
         let child = {
             let mut i=self.inner.lock().unwrap();
             i.stopping=true; i.epoch+=1; i.stage="stopped"; i.detail="接收服务已停止".into();
-            i.issue=None; i.connected_since=None; i.connecting_at=None; i.applied_device_name=None; i.applied_fps=None; i.applied_brightness=None; i.restart_attempts=0;
+            i.issue=None; i.connected_since=None; i.connecting_at=None; i.applied_device_name=None; i.applied_fps=None; i.applied_brightness=None; i.applied_uxplay_args=None; i.restart_attempts=0;
             i.log("stopped_by_user"); i.child.take()
         };
         if let Some(mut child) = child { let _ = child.kill(); let _ = child.wait(); }
@@ -124,40 +128,27 @@ impl Controller {
         self.start(app, true)
     }
     pub fn start(self: &Arc<Self>, app: &AppHandle, reset_backoff: bool) -> Snapshot {
-        let (epoch, name, fps, brightness) = {
+        let (epoch, name, fps, brightness, user_args) = {
             let mut i=self.inner.lock().unwrap();
             if start_already_in_progress(i.child.is_some(), i.stopping, i.stage) { return i.snapshot(); }
             i.stopping=false;
             if reset_backoff { i.restart_attempts=0; }
             i.epoch+=1; i.stage="starting"; i.detail="正在启动 UxPlay…".into(); i.issue=None;
-            i.connected_since=None; i.connecting_at=None; i.started_at=Some(Instant::now()); i.applied_device_name=None; i.applied_fps=None; i.applied_brightness=None;
-            i.log("starting_receiver"); (i.epoch, i.settings.device_name.clone(), i.settings.fps, i.settings.brightness)
+            i.connected_since=None; i.connecting_at=None; i.started_at=Some(Instant::now()); i.applied_device_name=None; i.applied_fps=None; i.applied_brightness=None; i.applied_uxplay_args=None;
+            i.log("starting_receiver"); (i.epoch, i.settings.device_name.clone(), i.settings.fps, i.settings.brightness, i.settings.uxplay_args.clone())
         };
         self.publish(app);
         let (binary, dev_binary) = match sidecar_path(app) {
             Ok(path)=>path,
             Err(err)=>{ self.error(app,epoch,"missing_binary",&err); return self.snapshot(); }
         };
+        // GUI settings always win, then expert parameters, then built-in defaults.
+        let effective_args = match crate::uxplay_args::effective(&name, fps, brightness, &user_args) {
+            Ok(args) => args,
+            Err(err) => { self.error(app, epoch, "unknown", &err); return self.snapshot(); }
+        };
         let mut command = Command::new(&binary);
-        command.args(["-n", &name, "-d", "1"]).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
-        // Requested maximum FPS is advisory: the phone may send fewer frames.
-        // Keep the default timestamp sync on Windows to avoid audio drift.
-        let fps_arg = fps.to_string();
-        command.args(["-fps", fps_arg.as_str(), "-vol", "0.5"]);
-        // UxPlay's -vc substitutes the converter fragment in its GStreamer pipeline.
-        // Add videobalance only below 100%, keeping the unmodified picture at 100%.
-        // This is applied at receiver start (the sidecar has no runtime brightness IPC).
-        if brightness < 100 {
-            let balance = settings::videobalance_brightness(brightness);
-            let converter = format!("videoconvert ! videobalance brightness={balance}");
-            command.args(["-vc", converter.as_str()]);
-        }
-        // Win7 software decoding improved scrolling subtitle smoothness in user tests.
-        #[cfg(windows)]
-        command.arg("-avdec");
-        // Preserve the previously verified macOS software-decoding/sync behavior.
-        #[cfg(target_os = "macos")]
-        command.args(["-avdec", "-vsync", "no"]);
+        command.args(&effective_args).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
         // Runtime lookup limited to the packaged GStreamer directory; no inherited global plugins.
         if let Err(err) = setup_gstreamer(app, &mut command, dev_binary) {
             self.error(app,epoch,"missing_runtime",&err); return self.snapshot();
@@ -181,7 +172,7 @@ impl Controller {
         {
             let mut i=self.inner.lock().unwrap();
             if i.epoch != epoch || i.stopping { let _=child.kill(); let _=child.wait(); return i.snapshot(); }
-            i.child=Some(child); i.applied_device_name=Some(name); i.applied_fps=Some(fps); i.applied_brightness=Some(brightness);
+            i.child=Some(child); i.applied_device_name=Some(name); i.applied_fps=Some(fps); i.applied_brightness=Some(brightness); i.applied_uxplay_args=Some(user_args);
             if dev_binary { i.log("development_local_binary_unbundled_gstreamer"); }
             i.log("sidecar_spawned_discovery_unverified");
         }
@@ -267,7 +258,7 @@ impl Controller {
         let retry_delay = {
             let mut i=self.inner.lock().unwrap();
             if i.epoch!=epoch || i.stopping {return;}
-            i.child.take(); i.connected_since=None; i.connecting_at=None; i.applied_device_name=None; i.applied_fps=None; i.applied_brightness=None;
+            i.child.take(); i.connected_since=None; i.connecting_at=None; i.applied_device_name=None; i.applied_fps=None; i.applied_brightness=None; i.applied_uxplay_args=None;
             if i.started_at.map(|t| t.elapsed() > Duration::from_secs(60)).unwrap_or(false) { i.restart_attempts=0; }
             i.restart_attempts=i.restart_attempts.saturating_add(1);
             i.stage="error";

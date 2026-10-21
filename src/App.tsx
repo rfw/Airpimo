@@ -5,7 +5,7 @@ import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { Switch } from './components/ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './components/ui/dialog';
-import { defaultSnapshot, validateDeviceName, validateBrightness, validateFps, type Settings, type Snapshot, type ThemeChoice } from './domain/state';
+import { defaultSnapshot, validateDeviceName, validateBrightness, validateFps, validateUxplayArgs, type Settings, type Snapshot, type ThemeChoice } from './domain/state';
 import { copyText } from './lib/copy';
 import { desktop, isDesktop } from './lib/desktop';
 import { AirpimoHome } from './components/AirpimoHome';
@@ -135,6 +135,8 @@ function App() {
     if (fpsError) { setFormError(fpsError); return; }
     const brightnessError = validateBrightness(draft.brightness);
     if (brightnessError) { setFormError(brightnessError); return; }
+    const argsError = validateUxplayArgs(draft.uxplay_args);
+    if (argsError) { setFormError(argsError); return; }
     setFormError(''); setActionBusy(true);
     try { setSnapshot(await desktop.save({ ...draft, device_name: draft.device_name.trim() })); setSettingsOpen(false); }
     catch (error) { setFormError(String(error)); }
@@ -195,6 +197,14 @@ function App() {
               <div className="brightness-control"><input aria-label="画面亮度" type="range" min={0} max={100} step={5} value={draft.brightness} onChange={e => setDraft(x=>({...x,brightness:Number(e.target.value)}))}/><output aria-label="当前画面亮度">{draft.brightness}%</output></div></div>
             <div className="setting-row"><div><strong>启动时开启接收</strong><small>打开软件后自动启动 UxPlay</small></div><Switch aria-label="启动时开启接收" checked={draft.auto_start} onCheckedChange={value=>setDraft(x=>({...x,auto_start:value}))}/></div>
             <div className="setting-row"><div><strong>关闭后驻留托盘</strong><small>新安装默认开启，关闭主窗口后仍继续接收；保留已有用户的选择</small></div><Switch aria-label="关闭后驻留托盘" checked={draft.stay_in_tray} onCheckedChange={value=>setDraft(x=>({...x,stay_in_tray:value}))}/></div>
+            <div className="airpimo-expert-args">
+              <label className="form-label" htmlFor="uxplayArgs">UxPlay 自定义启动参数（高级）</label>
+              <textarea id="uxplayArgs" className="airpimo-expert-input" rows={3} value={draft.uxplay_args}
+                maxLength={2048} placeholder="例如：-vol 0.7 -vsync no" spellCheck={false} autoCapitalize="off" autoComplete="off"
+                onChange={e => setDraft(x=>({...x,uxplay_args:e.target.value}))} />
+              <p className="airpimo-expert-warning" role="note">非专业人员请勿修改。参数配置不正确可能导致投屏无法启动。保存后需重启接收服务才会生效，不会自动断开当前投屏。</p>
+              <p className="form-hint">优先级：上方设备名称、帧率与亮度设置 ＞ 此处自定义参数 ＞ 程序默认参数。可按空格或换行分隔，使用引号包裹含空格的参数；-vol 可覆盖默认音量。</p>
+            </div>
           </section>
           <section id="airpimo-panel-theme" role="tabpanel" aria-labelledby="airpimo-tab-theme" hidden={settingsTab !== 'theme'}>
             <p className="airpimo-settings-copy">选择 Airpimo 的界面颜色。保存后立即生效。</p>

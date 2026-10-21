@@ -15,6 +15,8 @@ pub struct Settings {
     pub fps: u16,
     #[serde(default = "default_brightness")]
     pub brightness: u8,
+    #[serde(default)]
+    pub uxplay_args: String,
 }
 pub const fn default_fps() -> u16 { 60 }
 // Relative picture-darkening control, not the physical screen backlight.
@@ -33,7 +35,7 @@ pub fn validate_fps(value: u16) -> Result<(), String> {
 }
 impl Default for Settings {
     fn default() -> Self {
-        Self { device_name: "Airpimo".to_string(), auto_start: true, stay_in_tray: true, theme: Theme::System, fps: default_fps(), brightness: default_brightness() }
+        Self { device_name: "Airpimo".to_string(), auto_start: true, stay_in_tray: true, theme: Theme::System, fps: default_fps(), brightness: default_brightness(), uxplay_args: String::new() }
     }
 }
 pub fn validate_name(value: &str) -> Result<(), String> {
@@ -48,7 +50,7 @@ pub fn validate_name(value: &str) -> Result<(), String> {
 pub fn load(path: &Path) -> (Settings, bool) {
     match fs::read(path) {
         Ok(data) => match serde_json::from_slice::<Settings>(&data) {
-            Ok(value) if validate_name(&value.device_name).is_ok() && validate_fps(value.fps).is_ok() && validate_brightness(value.brightness).is_ok() => (value, true),
+            Ok(value) if validate_name(&value.device_name).is_ok() && validate_fps(value.fps).is_ok() && validate_brightness(value.brightness).is_ok() && crate::uxplay_args::validate(&value.uxplay_args).is_ok() => (value, true),
             _ => (Settings::default(), false),
         },
         Err(_) => (Settings::default(), true),
@@ -58,6 +60,7 @@ pub fn save(path: &Path, settings: &Settings) -> Result<(), String> {
     validate_name(&settings.device_name)?;
     validate_fps(settings.fps)?;
     validate_brightness(settings.brightness)?;
+    crate::uxplay_args::validate(&settings.uxplay_args)?;
     let dir = path.parent().ok_or("配置路径无效")?;
     fs::create_dir_all(dir).map_err(|e| format!("创建配置目录失败: {e}"))?;
     let tmp = path.with_extension(format!("{}.tmp", std::process::id()));
@@ -81,7 +84,7 @@ mod tests {
     }
     #[test] fn settings_roundtrip() {
         let path = std::env::temp_dir().join(format!("uxplay-setting-{}-test.json", std::process::id()));
-        let data = Settings {device_name:"Office-AirPlay".into(),auto_start:false,stay_in_tray:true,theme:Theme::Dark,fps:120,brightness:65};
+        let data = Settings {device_name:"Office-AirPlay".into(),auto_start:false,stay_in_tray:true,theme:Theme::Dark,fps:120,brightness:65,uxplay_args:"-vol 0.75".into()};
         save(&path,&data).unwrap();
         let (loaded,valid) = load(&path); assert!(valid); assert_eq!(loaded, data);
         let _=fs::remove_file(path);
@@ -95,6 +98,7 @@ mod tests {
         assert!(settings.stay_in_tray);
         assert_eq!(settings.fps, 60);
         assert_eq!(settings.brightness, 80);
+        assert_eq!(settings.uxplay_args, "");
     }
     #[test] fn picture_brightness_mapping_and_boundaries() {
         assert_eq!(default_brightness(), 80);

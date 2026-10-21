@@ -69,15 +69,19 @@ test('missing MSYS2 toolchain is explained before first Windows build',()=>sandb
 }));
 test('macOS app keeps verified software decoder and release ignores debug override',()=>{
  const fs=readFileSync(new URL('../src-tauri/src/receiver.rs',import.meta.url),'utf8');
- assert.match(fs,/#\[cfg\(target_os = "macos"\)\]\s*command\.args\(\["-avdec", "-vsync", "no"\]\)/);
+ const args = readFileSync(new URL('../src-tauri/src/uxplay_args.rs',import.meta.url),'utf8');
+  assert.match(args,/cfg\(target_os = "macos"\)/);
+  assert.match(args,/push_default\(&mut args, &custom, "-vsync", Some\("no"\)\)/);
  assert.match(fs,/#\[cfg\(debug_assertions\)\]\s*if let Some\(override_path\)/);
  assert.match(fs,/GST_PLUGIN_SYSTEM_PATH_1_0/);
 });
 
 test('FPS and 50% initial volume flow into UxPlay; Windows has software decoder with default timestamp sync',()=>{
  const fs=readFileSync(new URL('../src-tauri/src/receiver.rs',import.meta.url),'utf8');
- assert.match(fs,/command\.args\(\["-fps", fps_arg\.as_str\(\), "-vol", "0\.5"\]\)/);
- assert.match(fs,/#\[cfg\(windows\)\]\s*command\.arg\("-avdec"\)/);
+ const args = readFileSync(new URL('../src-tauri/src/uxplay_args.rs',import.meta.url),'utf8');
+  assert.match(args,/push_default\(&mut args, &custom, "-vol", Some\("0\.5"\)\)/);
+  assert.match(args,/"-fps"\.into\(\), fps\.to_string\(\)/);
+ assert.match(args,/cfg\(any\(windows, target_os = "macos"\)\)/);
  assert.doesNotMatch(fs,/#\[cfg\(windows\)\]\s*command\.args\(\["-vsync", "no"\]\)/);
  assert.match(fs,/applied_fps: self\.applied_fps/);
 });
@@ -87,9 +91,10 @@ test('brightness is backed by real UxPlay -vc videobalance and retains Windows A
   const receiver=readFileSync(new URL('../src-tauri/src/receiver.rs', import.meta.url),'utf8');
   const settings=readFileSync(new URL('../src-tauri/src/settings.rs', import.meta.url),'utf8');
   const app=readFileSync(new URL('../src/App.tsx', import.meta.url),'utf8');
-  assert.match(receiver,/if brightness < 100/);
-  assert.match(receiver,/let converter = format!\("videoconvert ! videobalance brightness=\{balance\}"\)/);
-  assert.match(receiver,/command\.args\(\["-vc", converter\.as_str\(\)\]\)/);
+  const args = readFileSync(new URL('../src-tauri/src/uxplay_args.rs', import.meta.url),'utf8');
+  assert.match(args,/if brightness < 100/);
+  assert.match(args,/videoconvert ! videobalance brightness=/);
+  assert.match(args,/args\.push\("-vc"\.into\(\)\)/);
   assert.match(receiver,/applied_brightness: self\.applied_brightness/);
   assert.match(receiver,/#\[cfg\(windows\)\]\s*command\.arg\("-avdec"\)/);
   assert.match(settings,/serde\(default = "default_brightness"\)/);

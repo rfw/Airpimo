@@ -25,7 +25,7 @@ const conf=JSON.parse(readFileSync(join(dir,'src-tauri/tauri.conf.json')));
 const win7=JSON.parse(readFileSync(join(dir,'src-tauri/tauri.win7.conf.json')));
 assert.match(rust,/fn sidecar_path\(/);
 assert.match(rust,/fn setup_gstreamer\(/);
-assert.match(rust,/command\.args\(\["-n", &name, "-d", "1"\]\)/);
+assert.match(rust,/command\.args\(&effective_args\)/);
 assert.match(rust,/discovery_verified: false/);
 assert.match(rust,/audio_verified: false/);
 assert.match(rust,/Observation::MirrorStarted/);

@@ -27,7 +27,7 @@ test('Windows UxPlay process is launched without a console window and keeps outp
   assert.match(receiver, /#\[cfg\(windows\)\]\s*use std::os::windows::process::CommandExt;/);
   assert.match(receiver, /#\[cfg\(windows\)\]\s*const CREATE_NO_WINDOW: u32 = 0x0800_0000;/);
   assert.match(receiver, /#\[cfg\(windows\)\]\s*command\.creation_flags\(CREATE_NO_WINDOW\);/);
-  assert.match(receiver, /command\.args\(\["-n", &name, "-d", "1"\]\)\.stdin\(Stdio::null\(\)\)\.stdout\(Stdio::piped\(\)\)\.stderr\(Stdio::piped\(\)\)/);
+  assert.match(receiver, /command\.args\(&effective_args\)\.stdin\(Stdio::null\(\)\)\.stdout\(Stdio::piped\(\)\)\.stderr\(Stdio::piped\(\)\)/);
   assert.ok(receiver.indexOf('command.creation_flags(CREATE_NO_WINDOW)') < receiver.indexOf('command.spawn()'));
   assert.doesNotMatch(receiver, /DETACHED_PROCESS\s*\|/);
 });

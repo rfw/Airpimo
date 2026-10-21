@@ -1,6 +1,7 @@
 mod diagnostic;
 mod receiver;
 mod settings;
+mod uxplay_args;
 
 use std::{path::PathBuf, sync::Arc};
 use receiver::{Controller, Snapshot};
