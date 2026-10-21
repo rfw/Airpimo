@@ -1,0 +1,42 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+*.log
+.DS_Store
+src-tauri/resources/sidecar/uxplay
+src-tauri/resources/sidecar/uxplay.exe
+src-tauri/resources/gstreamer/bin/
+src-tauri/resources/gstreamer/lib/
+src-tauri/resources/webview2-fixed-109/
+!src-tauri/resources/**/README.txt
+
+*.tsbuildinfo
+# Verified platform engines, downloaded upstream source, and native runtime bytes
+native-artifacts/
+native/cache/
+native/build/
+src-tauri/resources/gstreamer/libexec/
+*.incoming-*
+
+# Win7 Fixed Version 109 binary runtime (provide locally from Microsoft)
+src-tauri/webview2-109/
+
+# Local platform-specific NSIS copies
+/release-installers/
+
+# Downloaded GitHub Actions review inputs
+ci-input/
+.airpimo-brand-backup/
+.airpimo-ui-v21-backup/
+.airpimo-v22-backup/
+.airpimo-v23-backup/
+.airpimo-v24-backup/
+
+.airpimo-v25-backup/
+.airpimo-v26-backup/
+/.airpimo-*-backup/
+/.win-cxx-abi-backup/
+
+.idea
+.vscode

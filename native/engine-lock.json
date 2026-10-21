@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "upstream": "https://github.com/FDH2/UxPlay.git",
+  "commit": "df67c212a433cf6dda3676dd40c097900d24e645",
+  "version": "1.73.7",
+  "buildFlags": ["-DNO_MARCH_NATIVE=ON"],
+  "platforms": ["darwin-x64", "darwin-arm64", "win32-x64"],
+  "note": "Windows 7 candidate uses MSYS2 MINGW64/MSVCRT and must pass independent device validation."
+}

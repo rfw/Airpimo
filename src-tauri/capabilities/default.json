@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier":"default",
+  "description":"Only embedded application window receives default Tauri capability; no arbitrary shell, network or filesystem plugins",
+  "windows":["main"],
+  "permissions":["core:default","core:window:allow-start-dragging","core:event:allow-listen","core:event:allow-unlisten"]
+}

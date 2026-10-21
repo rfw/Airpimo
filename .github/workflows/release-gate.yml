@@ -1,0 +1,304 @@
+name: Airpimo Release (Windows + macOS)
+
+# Push a version tag (vX.Y.Z or vX.Y.Z-rc.N); CI runs on branches/PRs only.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+concurrency:
+  group: uxplay-tag-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Verify version tag matches npm, Tauri and Cargo metadata
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: node scripts/ci/prepare-release-assets.mjs verify-tag --tag "$RELEASE_TAG"
+      - run: npm test
+      - run: npm run test:source
+      - run: npm run build
+      - run: npm run check:rust-lock
+
+  # Build native Windows artifacts only once; both installer flavors consume the
+  # checked, per-workflow artifact. No reviewed-release uploads, no local E: drive.
+  windows_native:
+    name: Build pinned Windows x64 mDNS runtime in cloud
+    needs: source
+    runs-on: windows-2022
+    outputs:
+      runtime_sha: ${{ steps.native_digest.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: MSYS2 MINGW64 (never UCRT64 for Win7 candidate)
+        id: msys
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          # Win7 msvcrt ABI baseline; UCRT64 requires separate Win7 compatibility validation.
+          suppress-deprecation-warnings: msystem-mingw64
+          update: true
+          cache: true
+          install: >-
+            git
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-openssl
+            mingw-w64-x86_64-libplist
+      - name: Fetch and verify official GStreamer 1.24.13 MinGW MSI packages
+        id: gst_install
+        shell: pwsh
+        run: ./scripts/ci/install-gstreamer-win.ps1
+      - name: Upload GStreamer MSI logs if installation fails
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: uxplay-ci-gstreamer-msi-logs
+          path: ${{ runner.temp }}/uxplay-gst-msi/*.install.log
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Build pinned UxPlay 1.74 internal mDNS (no Bonjour)
+        shell: pwsh
+        env:
+          MSYS2_ROOT: ${{ steps.msys.outputs.msys2-location }}
+        run: |
+          npm run native:mdns:build:win7 -- --msys-root "$env:MSYS2_ROOT" --gst "$env:UXPLAY_GST_RUNTIME"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Stage full DLL closure and check Win7 APIs + plugin load
+        shell: pwsh
+        env:
+          MSYS2_ROOT: ${{ steps.msys.outputs.msys2-location }}
+        run: |
+          $dllBin = Join-Path $env:MSYS2_ROOT 'mingw64\bin'
+          npm run native:bundle:prepare:win7:mdns -- --gst "$env:UXPLAY_GST_RUNTIME" --dll-source "$dllBin" --msys-root "$env:MSYS2_ROOT"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Create intra-run native bundle
+        shell: pwsh
+        id: native_digest
+        run: |
+          New-Item -ItemType Directory -Force ci-output | Out-Null
+          node scripts/ci-native-release.mjs export --out "$PWD/ci-output/windows-native.tar.gz"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $sha = (Get-FileHash 'ci-output/windows-native.tar.gz' -Algorithm SHA256).Hash.ToLowerInvariant()
+          "sha256=$sha" >> $env:GITHUB_OUTPUT
+      - uses: actions/upload-artifact@v7
+        with:
+          name: airpimo-ci-windows-native
+          path: ci-output/windows-native.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  win7:
+    name: Windows 7 NSIS x64 candidate
+    needs: windows_native
+    runs-on: windows-2022
+    env:
+      RUSTUP_TOOLCHAIN: 1.77.2-x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.77.2
+          targets: x86_64-pc-windows-msvc
+      - uses: actions/download-artifact@v8
+        with:
+          name: airpimo-ci-windows-native
+          path: ci-input
+      - name: Stage SHA-256 verified intra-run native runtime
+        shell: pwsh
+        env:
+          EXPECTED_SHA: ${{ needs.windows_native.outputs.runtime_sha }}
+        run: |
+          node scripts/ci-native-release.mjs stage --file "$PWD/ci-input/windows-native.tar.gz" --sha256 "$env:EXPECTED_SHA"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Fetch pinned legacy WebView2 109 Fixed Runtime
+        shell: pwsh
+        run: ./scripts/ci/install-webview109-win.ps1
+      - name: Verify all Win7 ABI/imports, plugins and internal-mDNS provenance
+        run: npm run native:verify:win7:mdns
+      - name: Build Win7 NSIS (contains WebView2 109)
+        run: npm run desktop:build:win7:mdns
+      - uses: actions/upload-artifact@v7
+        with:
+          name: airpimo-win7-nsis-candidate
+          path: release-installers/win7/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  win10plus:
+    name: Win10/11
+    needs: windows_native
+    runs-on: windows-2022
+    env:
+      RUSTUP_TOOLCHAIN: 1.77.2-x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.77.2
+          targets: x86_64-pc-windows-msvc
+      - uses: actions/download-artifact@v8
+        with:
+          name: airpimo-ci-windows-native
+          path: ci-input
+      - name: Stage checked native runtime (no WebView2 109)
+        shell: pwsh
+        env:
+          EXPECTED_SHA: ${{ needs.windows_native.outputs.runtime_sha }}
+        run: |
+          node scripts/ci-native-release.mjs stage --file "$PWD/ci-input/windows-native.tar.gz" --sha256 "$env:EXPECTED_SHA"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - run: node scripts/check-native.mjs --require-mdns
+      - name: Build Win10/11 NSIS (Evergreen WebView2, downloaded if absent)
+        run: npm run desktop:build:win10
+      - uses: actions/upload-artifact@v7
+        with:
+          name: airpimo-win10plus-nsis-candidate
+          path: release-installers/win10plus/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  macos_intel:
+    name: macOS Intel x64 unsigned DMG candidate
+    needs: source
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          targets: x86_64-apple-darwin
+      - name: Build and stage pinned macOS runtime from cloud dependencies
+        run: bash scripts/ci/prepare-macos.sh x86_64-apple-darwin
+      - name: Relocate Mach-O load commands, verify staged runtime
+        run: |
+          npm run native:relocate:mac -- --apply
+          npm run native:verify:release
+      - name: Build unsigned Intel DMG
+        run: npx tauri build --target x86_64-apple-darwin --bundles app,dmg
+      - run: npm run native:verify:app -- --target x86_64-apple-darwin
+      - name: Normalize and validate exactly one Intel DMG
+        run: node scripts/ci/prepare-release-assets.mjs stage-dmg --target x86_64-apple-darwin --out ci-dmg
+      - uses: actions/upload-artifact@v7
+        with:
+          name: airpimo-macos-intel-dmg-candidate
+          path: ci-dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 14
+
+  macos_arm64:
+    name: macOS Apple Silicon ARM64 unsigned DMG candidate
+    needs: source
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          targets: aarch64-apple-darwin
+      - name: Build and stage pinned macOS runtime from cloud dependencies
+        run: bash scripts/ci/prepare-macos.sh aarch64-apple-darwin
+      - name: Relocate Mach-O load commands, verify staged runtime
+        run: |
+          npm run native:relocate:mac -- --apply
+          npm run native:verify:release
+      - name: Build unsigned Apple Silicon DMG
+        run: npx tauri build --target aarch64-apple-darwin --bundles app,dmg
+      - run: npm run native:verify:app -- --target aarch64-apple-darwin
+      - name: Normalize and validate exactly one Apple Silicon DMG
+        run: node scripts/ci/prepare-release-assets.mjs stage-dmg --target aarch64-apple-darwin --out ci-dmg
+      - uses: actions/upload-artifact@v7
+        with:
+          name: airpimo-macos-arm64-dmg-candidate
+          path: ci-dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish GitHub Release (all four targets must pass)
+    needs: [win7, win10plus, macos_intel, macos_arm64]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v8
+        with:
+          name: airpimo-win7-nsis-candidate
+          path: release-input/win7
+      - uses: actions/download-artifact@v8
+        with:
+          name: airpimo-win10plus-nsis-candidate
+          path: release-input/win10plus
+      - uses: actions/download-artifact@v8
+        with:
+          name: airpimo-macos-intel-dmg-candidate
+          path: release-input/macos-intel
+      - uses: actions/download-artifact@v8
+        with:
+          name: airpimo-macos-arm64-dmg-candidate
+          path: release-input/macos-arm64
+      - name: Verify all installers and prepare uniquely named release assets
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          SOURCE_COMMIT: ${{ github.sha }}
+        run: node scripts/ci/prepare-release-assets.mjs prepare --tag "$RELEASE_TAG" --input release-input --out release-assets
+      - name: Publish release only after all assets are validated
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "BLOCKED: Release $RELEASE_TAG already exists; refusing to overwrite published assets."
+            exit 1
+          fi
+          release_opts=(--verify-tag --generate-notes --title "Airpimo $RELEASE_TAG")
+          if [[ "$RELEASE_TAG" == *-* ]]; then
+            release_opts+=(--prerelease --latest=false)
+          fi
+          gh release create "$RELEASE_TAG" release-assets/* "${release_opts[@]}"
+          echo "Published https://github.com/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}"

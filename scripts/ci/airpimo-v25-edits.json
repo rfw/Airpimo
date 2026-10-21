@@ -1,0 +1,216 @@
+{
+ "version": 25,
+ "edits": [
+  {
+   "path": ".gitignore",
+   "hunks": [
+    {
+     "before": ".airpimo-v22-backup/\n.airpimo-v23-backup/\n.airpimo-v24-backup/\n",
+     "after": ".airpimo-v22-backup/\n.airpimo-v23-backup/\n.airpimo-v24-backup/\n\n.airpimo-v25-backup/\n"
+    }
+   ]
+  },
+  {
+   "path": "scripts/ci/apply-airpimo-ui-v21.mjs",
+   "hunks": [
+    {
+     "before": "      const homePresent = /<AirpimoHome(?:\\s|\\/>)/.test(original);\n      // v19/v21 generated a Blob filename in React. v23 moves the filename and\n      // actual file write into Rust, leaving a native export call in React.\n      const legacyExport = original.includes('airpimo-diagnostics-');\n      const nativeExport = /await desktop\\.exportDiagnostics\\(\\)/.test(original) &&\n        /setDiagnosticsExportStatus\\(/.test(original) &&\n        original.includes('diagnosticsExporting');\n",
+     "after": "      const homePresent = /<AirpimoHome(?:\\s|\\/>)/.test(original);\n      // v19/v21 generated a Blob filename in React. v23 moves the filename and\n      // actual file write into Rust, leaving a native export call in React.\n      const legacyExport = /link\\.download\\s*=\\s*`airpimo-diagnostics-/.test(original);\n      const nativeExport = /await desktop\\.exportDiagnostics\\(\\)/.test(original) &&\n        /setDiagnosticsExportStatus\\(/.test(original) &&\n        original.includes('diagnosticsExporting');\n"
+    }
+   ]
+  },
+  {
+   "path": "scripts/ci/apply-airpimo-v22.mjs",
+   "hunks": [
+    {
+     "before": "    return s;\n  });\n  edit('src/App.tsx',s=>{\n    s=replaceExactly(s,appEffectBefore,appEffectAfter,'App initial theme');\n    s=replaceExactly(s,'<small>默认关闭窗口即退出并停止投屏</small>',\n      '<small>默认开启：关闭窗口后继续在托盘接收；从托盘菜单可彻底退出</small>','tray help');\n",
+     "after": "    return s;\n  });\n  edit('src/App.tsx',s=>{\n    if (s.includes(\"type SettingsTab = 'config' | 'theme' | 'updates' | 'diagnostics';\")) {\n      if (!s.includes('checked={draft.stay_in_tray}') || !s.includes(\"localStorage.setItem('airpimo.theme', theme)\")) throw Error('App v25: anchor missing');\n      return s;\n    }\n    s=replaceExactly(s,appEffectBefore,appEffectAfter,'App initial theme');\n    s=replaceExactly(s,'<small>默认关闭窗口即退出并停止投屏</small>',\n      '<small>默认开启：关闭窗口后继续在托盘接收；从托盘菜单可彻底退出</small>','tray help');\n"
+    }
+   ]
+  },
+  {
+   "path": "scripts/ci/apply-airpimo-v23.mjs",
+   "hunks": [
+    {
+     "before": "    \"  async diagnostics(): Promise<string> { requireDesktop(); return invoke('get_diagnostics'); },\",\n    \"  async diagnostics(): Promise<string> { requireDesktop(); return invoke('get_diagnostics'); },\\n  async exportDiagnostics(): Promise<string> { requireDesktop(); return invoke('export_diagnostics'); },\", 'native export invoke'));\n  edit('src/App.tsx',initial=>{\n    let s=initial;\n    s=one(s,\"  const [diagnostics, setDiagnostics] = useState('');\", \"  const [diagnostics, setDiagnostics] = useState('');\\n  const [diagnosticsExportStatus, setDiagnosticsExportStatus] = useState('');\\n  const [diagnosticsExporting, setDiagnosticsExporting] = useState(false);\",'diagnostics state');\n    s=one(s,\"    setDiagnosticsOpen(true); setDiagnostics('读取中…');\", \"    setDiagnosticsOpen(true); setDiagnostics('读取中…'); setDiagnosticsExportStatus('');\",'diagnostics reset');\n",
+     "after": "    \"  async diagnostics(): Promise<string> { requireDesktop(); return invoke('get_diagnostics'); },\",\n    \"  async diagnostics(): Promise<string> { requireDesktop(); return invoke('get_diagnostics'); },\\n  async exportDiagnostics(): Promise<string> { requireDesktop(); return invoke('export_diagnostics'); },\", 'native export invoke'));\n  edit('src/App.tsx',initial=>{\n    if (initial.includes(\"type SettingsTab = 'config' | 'theme' | 'updates' | 'diagnostics';\")) {\n      // v25 moves the old independent diagnostic dialog into Settings.\n      // Verify its complete native export chain instead of reintroducing old JSX.\n      if (!initial.includes('await desktop.exportDiagnostics()') ||\n          !initial.includes('role=\"tabpanel\"') ||\n          !initial.includes('diagnosticsExportStatus')) throw Error('v25 diagnostics integration incomplete');\n      return initial;\n    }\n    let s=initial;\n    s=one(s,\"  const [diagnostics, setDiagnostics] = useState('');\", \"  const [diagnostics, setDiagnostics] = useState('');\\n  const [diagnosticsExportStatus, setDiagnosticsExportStatus] = useState('');\\n  const [diagnosticsExporting, setDiagnosticsExporting] = useState(false);\",'diagnostics state');\n    s=one(s,\"    setDiagnosticsOpen(true); setDiagnostics('读取中…');\", \"    setDiagnosticsOpen(true); setDiagnostics('读取中…'); setDiagnosticsExportStatus('');\",'diagnostics reset');\n"
+    },
+    {
+     "before": "    return s;\n  });\n  edit('src-tauri/src/lib.rs',s=>{\n    s=one(s,'fn get_diagnostics(app:AppHandle) -> String { controller(&app).diagnostics() }',\n`fn get_diagnostics(app:AppHandle) -> String { controller(&app).diagnostics() }\n\n",
+     "after": "    return s;\n  });\n  edit('src-tauri/src/lib.rs',s=>{\n    if (s.includes('fn open_release_page(url: String)')) {\n      if (!s.includes('get_diagnostics,export_diagnostics,open_release_page]')) throw Error('v25 IPC registration incomplete');\n      return s;\n    }\n    s=one(s,'fn get_diagnostics(app:AppHandle) -> String { controller(&app).diagnostics() }',\n`fn get_diagnostics(app:AppHandle) -> String { controller(&app).diagnostics() }\n\n"
+    }
+   ]
+  },
+  {
+   "path": "scripts/ci/apply-airpimo-v24.mjs",
+   "hunks": [
+    {
+     "before": "    return one(s,beforeJsx,afterJsx,'v23 diagnostic status JSX');\n  });\n  edit('scripts/ci/apply-airpimo-v23.mjs', s => one(s,beforeJsx,afterJsx,'v23 installer JSX template'));\n  edit('scripts/ci/apply-airpimo-ui-v21.mjs', s => one(s,oldUI,newUI,'v21 home UI validator'));\n  edit('tests/airpimo-brand.test.mjs', s => one(s,oldBrand,newBrand,'v19 brand diagnostics assertion'));\n  edit('.gitignore', s => s.includes('.airpimo-v24-backup/') ? s : `${s.replace(/\\s*$/,'')}\\n.airpimo-v24-backup/\\n`);\n  return changes;\n}\n",
+     "after": "    return one(s,beforeJsx,afterJsx,'v23 diagnostic status JSX');\n  });\n  edit('scripts/ci/apply-airpimo-v23.mjs', s => one(s,beforeJsx,afterJsx,'v23 installer JSX template'));\n  edit('scripts/ci/apply-airpimo-ui-v21.mjs', s => s.includes('const legacyExport = /link\\\\.download') ? s : one(s,oldUI,newUI,'v21 home UI validator'));\n  edit('tests/airpimo-brand.test.mjs', s => s.includes('(?:,open_release_page)?') ? s : one(s,oldBrand,newBrand,'v19 brand diagnostics assertion'));\n  edit('.gitignore', s => s.includes('.airpimo-v24-backup/') ? s : `${s.replace(/\\s*$/,'')}\\n.airpimo-v24-backup/\\n`);\n  return changes;\n}\n"
+    }
+   ]
+  },
+  {
+   "path": "src/App.tsx",
+   "hunks": [
+    {
+     "before": "import { useCallback, useEffect, useState } from 'react';\nimport { X } from 'lucide-react';\nimport { Button } from './components/ui/button';\nimport { Input } from './components/ui/input';\nimport { Switch } from './components/ui/switch';\n",
+     "after": "import { useCallback, useEffect, useRef, useState } from 'react';\nimport { X } from 'lucide-react';\nimport { brand } from './brand';\nimport { Button } from './components/ui/button';\nimport { Input } from './components/ui/input';\nimport { Switch } from './components/ui/switch';\n"
+    },
+    {
+     "before": "import { copyText } from './lib/copy';\nimport { desktop, isDesktop } from './lib/desktop';\nimport { AirpimoHome } from './components/AirpimoHome';\n\nfunction App() {\n  const [snapshot, setSnapshot] = useState<Snapshot>(defaultSnapshot);\n  const [ready, setReady] = useState(false);\n  const [actionBusy, setActionBusy] = useState(false);\n  const [settingsOpen, setSettingsOpen] = useState(false);\n  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);\n  const [diagnostics, setDiagnostics] = useState('');\n  const [diagnosticsExportStatus, setDiagnosticsExportStatus] = useState('');\n  const [diagnosticsExporting, setDiagnosticsExporting] = useState(false);\n",
+     "after": "import { copyText } from './lib/copy';\nimport { desktop, isDesktop } from './lib/desktop';\nimport { AirpimoHome } from './components/AirpimoHome';\nimport { checkAtStartup, checkForRelease, type ReleaseStatus } from './lib/release-update';\n\ntype SettingsTab = 'config' | 'theme' | 'updates' | 'diagnostics';\n\nfunction App() {\n  const [snapshot, setSnapshot] = useState<Snapshot>(defaultSnapshot);\n  const [ready, setReady] = useState(false);\n  const [actionBusy, setActionBusy] = useState(false);\n  const [settingsOpen, setSettingsOpen] = useState(false);\n  const [settingsTab, setSettingsTab] = useState<SettingsTab>('config');\n  const [updateResult, setUpdateResult] = useState<ReleaseStatus | null>(null);\n  const [updateChecking, setUpdateChecking] = useState(false);\n  const [releaseOpening, setReleaseOpening] = useState(false);\n  const updateRequest = useRef(0);\n  const [diagnostics, setDiagnostics] = useState('');\n  const [diagnosticsExportStatus, setDiagnosticsExportStatus] = useState('');\n  const [diagnosticsExporting, setDiagnosticsExporting] = useState(false);\n"
+    },
+    {
+     "before": "    if (query.addEventListener) { query.addEventListener('change', sync); return () => query.removeEventListener('change', sync); }\n    query.addListener(sync); return () => query.removeListener(sync);\n  }, [ready, snapshot.settings.theme]);\n  useEffect(() => {\n    if (snapshot.stage !== 'connected') return;\n    const timer = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);\n",
+     "after": "    if (query.addEventListener) { query.addEventListener('change', sync); return () => query.removeEventListener('change', sync); }\n    query.addListener(sync); return () => query.removeListener(sync);\n  }, [ready, snapshot.settings.theme]);\n  // One actual network check per application launch (also under React StrictMode).\n  useEffect(() => {\n    if (!isDesktop()) return;\n    const request = ++updateRequest.current;\n    setUpdateChecking(true);\n    void checkAtStartup(brand.version).then(result => {\n      if (updateRequest.current === request) setUpdateResult(result);\n    }).finally(() => {\n      if (updateRequest.current === request) setUpdateChecking(false);\n    });\n  }, []);\n  // A copied-name confirmation must not mask live receiver state indefinitely.\n  useEffect(() => {\n    if (!['复制成功', '诊断日志已导出'].includes(feedback)) return;\n    const timer = setTimeout(() => setFeedback(prev => prev === feedback ? '' : prev), 3200);\n    return () => clearTimeout(timer);\n  }, [feedback]);\n  useEffect(() => {\n    if (snapshot.stage !== 'connected') return;\n    const timer = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);\n"
+    },
+    {
+     "before": "    finally { setActionBusy(false); }\n  }, []);\n\n  function openSettings() {\n    setDraft({ ...snapshot.settings }); setFormError(''); setSettingsOpen(true);\n  }\n  async function saveSettings() {\n    const problem = validateDeviceName(draft.device_name);\n",
+     "after": "    finally { setActionBusy(false); }\n  }, []);\n\n  function openSettings(tab: SettingsTab = 'config') {\n    setDraft({ ...snapshot.settings }); setFormError(''); setSettingsTab(tab); setSettingsOpen(true);\n    if (tab === 'diagnostics') void loadDiagnostics();\n  }\n  function chooseTab(tab: SettingsTab) {\n    setSettingsTab(tab); setFormError('');\n    if (tab === 'diagnostics') void loadDiagnostics();\n  }\n  async function runUpdateCheck() {\n    const request = ++updateRequest.current;\n    setUpdateChecking(true);\n    try {\n      const result = await checkForRelease(brand.version);\n      if (updateRequest.current === request) setUpdateResult(result);\n    } finally {\n      if (updateRequest.current === request) setUpdateChecking(false);\n    }\n  }\n  async function openRelease() {\n    if (updateResult?.kind !== 'available' || releaseOpening) return;\n    setReleaseOpening(true);\n    try { await desktop.openReleasePage(updateResult.pageUrl); }\n    catch (error) { setUpdateResult({kind:'error', message:`打开下载页面失败：${String(error)}`}); }\n    finally { setReleaseOpening(false); }\n  }\n  async function saveSettings() {\n    const problem = validateDeviceName(draft.device_name);\n"
+    },
+    {
+     "before": "    catch (error) { setFormError(String(error)); }\n    finally { setActionBusy(false); }\n  }\n  async function openDiagnostics() {\n    setDiagnosticsOpen(true); setDiagnostics('读取中…'); setDiagnosticsExportStatus('');\n    try { setDiagnostics(await desktop.diagnostics()); }\n    catch (error) { setDiagnostics(`诊断读取失败：${String(error)}`); }\n  }\n",
+     "after": "    catch (error) { setFormError(String(error)); }\n    finally { setActionBusy(false); }\n  }\n  async function loadDiagnostics() {\n    setDiagnostics('读取中…'); setDiagnosticsExportStatus('');\n    try { setDiagnostics(await desktop.diagnostics()); }\n    catch (error) { setDiagnostics(`诊断读取失败：${String(error)}`); }\n  }\n"
+    },
+    {
+     "before": "      snapshot={snapshot} ready={ready} busy={actionBusy} now={now} bootError={bootError} feedback={feedback}\n      onStart={() => void execute(desktop.start)} onStop={() => void execute(desktop.stop)}\n      onRetry={() => void execute(desktop.retry)} onCopy={(value) => void copy(value)}\n      onSettings={openSettings} onDiagnostics={() => void openDiagnostics()} onClearFeedback={() => setFeedback('')}\n    />\n\n    <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>\n      <DialogContent className={dialogClass} overlayClassName={overlayClass}>\n        <div className=\"modal-heading\"><div><DialogTitle className=\"modal-title\">设置</DialogTitle><DialogDescription className=\"modal-subtitle\">接收器及应用行为</DialogDescription></div><button aria-label=\"关闭设置\" className=\"close-button\" onClick={() => setSettingsOpen(false)}><X size={18}/></button></div>\n        <form onSubmit={e => { e.preventDefault(); void saveSettings(); }}>\n          <label htmlFor=\"deviceName\" className=\"form-label\">投屏设备名称</label>\n          <Input id=\"deviceName\" value={draft.device_name} maxLength={48} onChange={e => setDraft(x=>({...x,device_name:e.target.value}))} autoComplete=\"off\" spellCheck={false}/>\n          <p className=\"form-hint\">修改后需重启接收服务，当前连接不会被中断。</p>\n          <div className=\"setting-row\">\n            <div><strong>最大请求帧率（FPS）</strong><small>默认 60；仅为上限，实际帧率由手机决定</small></div>\n            <Input className=\"fps-input\" aria-label=\"最大请求帧率\" type=\"number\" min={1} max={255} step={1}\n              value={draft.fps} onChange={e => setDraft(x=>({...x,fps:Number(e.target.value)}))}/>\n          </div>\n          <div className=\"setting-row brightness-setting\">\n            <div className=\"brightness-description\"><strong>画面亮度</strong><small>默认 80%；100% 为原始画面。保存后重启接收服务生效</small></div>\n            <div className=\"brightness-control\">\n              <input aria-label=\"画面亮度\" type=\"range\" min={0} max={100} step={5} value={draft.brightness}\n                onChange={e => setDraft(x=>({...x,brightness:Number(e.target.value)}))}/>\n              <output aria-label=\"当前画面亮度\">{draft.brightness}%</output>\n            </div>\n          </div>\n          <div className=\"setting-row\"><div><strong>启动时开启接收</strong><small>打开软件后自动启动 UxPlay</small></div><Switch aria-label=\"启动时开启接收\" checked={draft.auto_start} onCheckedChange={value=>setDraft(x=>({...x,auto_start:value}))}/></div>\n          <div className=\"setting-row\"><div><strong>关闭后驻留托盘</strong><small>默认开启：关闭窗口后继续在托盘接收；从托盘菜单可彻底退出</small></div><Switch aria-label=\"关闭后驻留托盘\" checked={draft.stay_in_tray} onCheckedChange={value=>setDraft(x=>({...x,stay_in_tray:value}))}/></div>\n          <label htmlFor=\"theme\" className=\"form-label theme-label\">主题</label>\n          <div className=\"theme-options\" role=\"radiogroup\" aria-label=\"主题\">\n            {([['system','跟随系统'],['light','浅色'],['dark','深色']] as const).map(([value,label]) =>\n              <label className=\"theme-option\" key={value}>\n                <input type=\"radio\" name=\"theme\" value={value} checked={draft.theme===value}\n                  onChange={()=>setDraft(x=>({...x,theme:value as ThemeChoice}))}/>\n                <span>{label}</span>\n              </label>\n            )}\n          </div>\n          {formError && <div className=\"form-error\" role=\"alert\">{formError}</div>}\n          <div className=\"modal-actions\"><Button variant=\"outline\" onClick={() => setSettingsOpen(false)}>取消</Button><Button type=\"submit\" disabled={actionBusy}>保存设置</Button></div>\n        </form>\n      </DialogContent>\n    </Dialog>\n\n    <Dialog open={diagnosticsOpen} onOpenChange={setDiagnosticsOpen}>\n      <DialogContent className={dialogClass} overlayClassName={overlayClass}><div className=\"modal-heading\"><div><DialogTitle className=\"modal-title\">诊断信息</DialogTitle><DialogDescription className=\"modal-subtitle\">只记录脱敏状态与错误类别，不采集画面</DialogDescription></div><button aria-label=\"关闭诊断\" className=\"close-button\" onClick={() => setDiagnosticsOpen(false)}><X size={18}/></button></div>\n        <textarea className=\"diagnostics-text\" value={diagnostics} readOnly aria-label=\"诊断日志\"/>\n        <div className=\"modal-actions\"><Button variant=\"outline\" onClick={() => void copy(diagnostics)}>复制</Button><Button onClick={() => void exportDiagnostics()} disabled={diagnosticsExporting}>{diagnosticsExporting ? '导出中…' : '导出日志'}</Button></div>\n        {diagnosticsExportStatus && <p className={`airpimo-export-status${diagnosticsExportStatus.startsWith('导出失败') ? ' is-error' : ''}`} role=\"status\" title={diagnosticsExportStatus}>{diagnosticsExportStatus}</p>}\n      </DialogContent>\n    </Dialog>\n  </>;\n",
+     "after": "      snapshot={snapshot} ready={ready} busy={actionBusy} now={now} bootError={bootError} feedback={feedback}\n      onStart={() => void execute(desktop.start)} onStop={() => void execute(desktop.stop)}\n      onRetry={() => void execute(desktop.retry)} onCopy={(value) => void copy(value)}\n      onSettings={() => openSettings()} onClearFeedback={() => setFeedback('')} updateAvailable={updateResult?.kind === 'available'}\n    />\n\n    <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>\n      <DialogContent className={`${dialogClass} airpimo-settings-dialog`} overlayClassName={overlayClass}>\n        <div className=\"modal-heading\"><div><DialogTitle className=\"modal-title\">设置</DialogTitle><DialogDescription className=\"modal-subtitle\">Airpimo · 配置与维护</DialogDescription></div><button aria-label=\"关闭设置\" className=\"close-button\" onClick={() => setSettingsOpen(false)}><X size={18}/></button></div>\n        <div className=\"airpimo-settings-tabs\" role=\"tablist\" aria-label=\"设置选项卡\">\n          {([['config','配置'],['theme','主题'],['updates','升级'],['diagnostics','诊断']] as const).map(([value,label]) =>\n            <button key={value} type=\"button\" id={`airpimo-tab-${value}`} role=\"tab\" aria-controls={`airpimo-panel-${value}`} aria-selected={settingsTab === value}\n              tabIndex={settingsTab === value ? 0 : -1} onClick={() => chooseTab(value)} className=\"airpimo-settings-tab\">{label}{value === 'updates' && updateResult?.kind === 'available' ? ' •' : ''}</button>\n          )}\n        </div>\n        <form className=\"airpimo-settings-body\" onSubmit={e => {e.preventDefault(); void saveSettings();}}>\n          <section id=\"airpimo-panel-config\" role=\"tabpanel\" aria-labelledby=\"airpimo-tab-config\" hidden={settingsTab !== 'config'}>\n            <label htmlFor=\"deviceName\" className=\"form-label\">投屏设备名称</label>\n            <Input id=\"deviceName\" value={draft.device_name} maxLength={48} onChange={e => setDraft(x=>({...x,device_name:e.target.value}))} autoComplete=\"off\" spellCheck={false}/>\n            <p className=\"form-hint\">修改后需重启接收服务，当前连接不会被中断。</p>\n            <div className=\"setting-row\"><div><strong>最大请求帧率（FPS）</strong><small>默认 60；实际帧率由手机决定</small></div>\n              <Input className=\"fps-input\" aria-label=\"最大请求帧率\" type=\"number\" min={1} max={255} step={1} value={draft.fps} onChange={e => setDraft(x=>({...x,fps:Number(e.target.value)}))}/></div>\n            <div className=\"setting-row brightness-setting\"><div className=\"brightness-description\"><strong>画面亮度</strong><small>默认 80%；保存后重启接收服务生效</small></div>\n              <div className=\"brightness-control\"><input aria-label=\"画面亮度\" type=\"range\" min={0} max={100} step={5} value={draft.brightness} onChange={e => setDraft(x=>({...x,brightness:Number(e.target.value)}))}/><output aria-label=\"当前画面亮度\">{draft.brightness}%</output></div></div>\n            <div className=\"setting-row\"><div><strong>启动时开启接收</strong><small>打开软件后自动启动 UxPlay</small></div><Switch aria-label=\"启动时开启接收\" checked={draft.auto_start} onCheckedChange={value=>setDraft(x=>({...x,auto_start:value}))}/></div>\n            <div className=\"setting-row\"><div><strong>关闭后驻留托盘</strong><small>新安装默认开启，关闭主窗口后仍继续接收；保留已有用户的选择</small></div><Switch aria-label=\"关闭后驻留托盘\" checked={draft.stay_in_tray} onCheckedChange={value=>setDraft(x=>({...x,stay_in_tray:value}))}/></div>\n          </section>\n          <section id=\"airpimo-panel-theme\" role=\"tabpanel\" aria-labelledby=\"airpimo-tab-theme\" hidden={settingsTab !== 'theme'}>\n            <p className=\"airpimo-settings-copy\">选择 Airpimo 的界面颜色。保存后立即生效。</p>\n            <div className=\"theme-options\" role=\"radiogroup\" aria-label=\"主题\">\n              {([['system','跟随系统'],['light','浅色'],['dark','深色']] as const).map(([value,label]) =>\n                <label className=\"theme-option\" key={value}><input type=\"radio\" name=\"theme\" value={value} checked={draft.theme===value}\n                    onChange={()=>setDraft(x=>({...x,theme:value as ThemeChoice}))}/><span>{label}</span></label>\n              )}\n            </div>\n          </section>\n          <section id=\"airpimo-panel-updates\" role=\"tabpanel\" aria-labelledby=\"airpimo-tab-updates\" hidden={settingsTab !== 'updates'}>\n            <div className=\"setting-row\"><div><strong>当前版本</strong><small>Airpimo v{brand.version}</small></div></div>\n            <div className={`airpimo-update-status${updateResult?.kind === 'error' ? ' is-error' : ''}`} role=\"status\" aria-live=\"polite\">\n              {updateChecking ? '正在检查更新…' : !updateResult ? '尚未检查更新' : updateResult.kind === 'available' ? `发现新版本 ${updateResult.latest}`\n                : updateResult.kind === 'latest' ? `已是最新版本（v${updateResult.current}）` : updateResult.message}\n            </div>\n            <div className=\"airpimo-update-actions\">\n              <Button type=\"button\" variant=\"outline\" onClick={() => void runUpdateCheck()} disabled={updateChecking}>{updateChecking ? '检查中…' : '检查更新'}</Button>\n              {updateResult?.kind === 'available' && <Button type=\"button\" onClick={() => void openRelease()} disabled={releaseOpening}>{releaseOpening ? '打开中…' : '前往下载新版本'}</Button>}\n            </div>\n            <p className=\"airpimo-settings-copy\">启动时自动检测一次，也可以手动检查。发现更新后打开官方 GitHub Release 下载页；当前安装包尚未配置签名自动安装。</p>\n          </section>\n          <section id=\"airpimo-panel-diagnostics\" role=\"tabpanel\" aria-labelledby=\"airpimo-tab-diagnostics\" hidden={settingsTab !== 'diagnostics'} className=\"airpimo-diagnostics-pane\">\n            <p className=\"airpimo-settings-copy\">只记录脱敏状态与错误类别，不采集投屏画面。</p>\n            <textarea className=\"diagnostics-text\" value={diagnostics} readOnly aria-label=\"诊断日志\"/>\n            <div className=\"modal-actions\">\n              <Button type=\"button\" variant=\"outline\" onClick={() => void loadDiagnostics()}>刷新</Button>\n              <Button type=\"button\" variant=\"outline\" onClick={() => void copy(diagnostics)}>复制</Button>\n              <Button type=\"button\" onClick={() => void exportDiagnostics()} disabled={diagnosticsExporting}>{diagnosticsExporting ? '导出中…' : '导出日志'}</Button>\n            </div>\n            {diagnosticsExportStatus && <p className={`airpimo-export-status${diagnosticsExportStatus.startsWith('导出失败') ? ' is-error' : ''}`} role=\"status\" title={diagnosticsExportStatus}>{diagnosticsExportStatus}</p>}\n          </section>\n          {formError && (settingsTab === 'config' || settingsTab === 'theme') && <div className=\"form-error\" role=\"alert\">{formError}</div>}\n          {(settingsTab === 'config' || settingsTab === 'theme') && <div className=\"modal-actions airpimo-settings-actions\">\n            <Button type=\"button\" variant=\"outline\" onClick={() => setSettingsOpen(false)}>取消</Button><Button type=\"submit\" disabled={actionBusy}>保存设置</Button>\n          </div>}\n        </form>\n      </DialogContent>\n    </Dialog>\n  </>;\n"
+    }
+   ]
+  },
+  {
+   "path": "src/components/AirpimoHome.tsx",
+   "hunks": [
+    {
+     "before": "import { CircleHelp, ClipboardCopy, LoaderCircle, MonitorSmartphone, Play, Settings, Square } from 'lucide-react';\nimport {brand} from '../brand';\nimport {type Snapshot, showRestartPrompt, issueHint} from '../domain/state';\nimport {homeStatus} from '../domain/home-status';\n",
+     "after": "import { ClipboardCopy, LoaderCircle, MonitorSmartphone, Play, Settings, Square } from 'lucide-react';\nimport {brand} from '../brand';\nimport {type Snapshot, showRestartPrompt, issueHint} from '../domain/state';\nimport {homeStatus} from '../domain/home-status';\n"
+    },
+    {
+     "before": "  onRetry(): void;\n  onCopy(name: string): void;\n  onSettings(): void;\n  onDiagnostics(): void;\n  onClearFeedback(): void;\n}\n\n",
+     "after": "  onRetry(): void;\n  onCopy(name: string): void;\n  onSettings(): void;\n  updateAvailable: boolean;\n  onClearFeedback(): void;\n}\n\n"
+    },
+    {
+     "before": "}\n\nexport function AirpimoHome({snapshot, ready, busy, now, bootError, feedback, onStart, onStop,\n  onRetry, onCopy, onSettings, onDiagnostics, onClearFeedback}: AirpimoHomeProps) {\n  const macOS = isMacOS();\n  const active = snapshot.process_running;\n  const name = active ? (snapshot.applied_device_name ?? snapshot.settings.device_name) : snapshot.settings.device_name;\n",
+     "after": "}\n\nexport function AirpimoHome({snapshot, ready, busy, now, bootError, feedback, onStart, onStop,\n  onRetry, onCopy, onSettings, onClearFeedback, updateAvailable}: AirpimoHomeProps) {\n  const macOS = isMacOS();\n  const active = snapshot.process_running;\n  const name = active ? (snapshot.applied_device_name ?? snapshot.settings.device_name) : snapshot.settings.device_name;\n"
+    },
+    {
+     "before": "      <div className=\"airpimo-footer-actions\">\n        <span className=\"airpimo-version\">v{brand.version}</span>\n        <span className=\"airpimo-separator\" aria-hidden=\"true\"/>\n        <button type=\"button\" className=\"airpimo-footer-button\" aria-label=\"打开设置\" title=\"设置\" disabled={!ready || !isDesktop()} onClick={onSettings}><Settings size={19} strokeWidth={1.8}/></button>\n        <span className=\"airpimo-separator\" aria-hidden=\"true\"/>\n        <button type=\"button\" className=\"airpimo-footer-button\" aria-label=\"查看诊断\" title=\"帮助与诊断\" disabled={!isDesktop()} onClick={onDiagnostics}><CircleHelp size={19} strokeWidth={1.8}/></button>\n      </div>\n    </footer>\n  </div>;\n",
+     "after": "      <div className=\"airpimo-footer-actions\">\n        <span className=\"airpimo-version\">v{brand.version}</span>\n        <span className=\"airpimo-separator\" aria-hidden=\"true\"/>\n        <button type=\"button\" className=\"airpimo-footer-button\" aria-label=\"打开设置\" title={updateAvailable ? \"设置 · 发现新版本\" : \"设置\"} disabled={!ready || !isDesktop()} onClick={onSettings}><Settings size={19} strokeWidth={1.8}/>{updateAvailable && <span className=\"airpimo-update-dot\" aria-label=\"发现新版本\"/>}</button>\n      </div>\n    </footer>\n  </div>;\n"
+    }
+   ]
+  },
+  {
+   "path": "src/lib/desktop.ts",
+   "hunks": [
+    {
+     "before": "  async save(settings: Settings): Promise<Snapshot> { requireDesktop(); return invoke('save_settings', { settings }); },\n  async diagnostics(): Promise<string> { requireDesktop(); return invoke('get_diagnostics'); },\n  async exportDiagnostics(): Promise<string> { requireDesktop(); return invoke('export_diagnostics'); },\n  async watch(cb:(value: Snapshot)=>void):Promise<UnlistenFn> { requireDesktop(); return listen<Snapshot>('receiver://snapshot', event=>cb(event.payload)); }\n};\n",
+     "after": "  async save(settings: Settings): Promise<Snapshot> { requireDesktop(); return invoke('save_settings', { settings }); },\n  async diagnostics(): Promise<string> { requireDesktop(); return invoke('get_diagnostics'); },\n  async exportDiagnostics(): Promise<string> { requireDesktop(); return invoke('export_diagnostics'); },\n  async openReleasePage(url: string): Promise<void> { requireDesktop(); return invoke('open_release_page', { url }); },\n  async watch(cb:(value: Snapshot)=>void):Promise<UnlistenFn> { requireDesktop(); return listen<Snapshot>('receiver://snapshot', event=>cb(event.payload)); }\n};\n"
+    }
+   ]
+  },
+  {
+   "path": "src/main.tsx",
+   "hunks": [
+    {
+     "before": "import './styles.css';\nimport './styles/airpimo-home.css';\nimport './styles/airpimo-dialogs.css';\ncreateRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);\n",
+     "after": "import './styles.css';\nimport './styles/airpimo-home.css';\nimport './styles/airpimo-dialogs.css';\nimport './styles/airpimo-settings-tabs.css';\ncreateRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);\n"
+    }
+   ]
+  },
+  {
+   "path": "src/styles/airpimo-home.css",
+   "hunks": [
+    {
+     "before": "  .airpimo-header { height: 42px; min-height: 42px; }\n}\n@media (prefers-reduced-motion: reduce) { .airpimo-primary { transition: none; } }\n",
+     "after": "  .airpimo-header { height: 42px; min-height: 42px; }\n}\n@media (prefers-reduced-motion: reduce) { .airpimo-primary { transition: none; } }\n\n/* A newer release is indicated on Settings without replacing receiver status. */\n.airpimo-footer-button { position: relative; }\n.airpimo-update-dot { position: absolute; width: 6px; height: 6px; border-radius: 50%; top: 1px; right: 1px; background: #3986ee; }\n"
+    }
+   ]
+  },
+  {
+   "path": "src-tauri/src/lib.rs",
+   "hunks": [
+    {
+     "before": "    std::fs::write(&destination,controller(&app).diagnostics())\n        .map_err(|e| format!(\"导出诊断日志失败（{}）：{e}\",destination.display()))?;\n    Ok(destination.to_string_lossy().to_string())\n}\n\n// Brand migration: existing UxPlay Desktop users retain their saved receiver settings.\n",
+     "after": "    std::fs::write(&destination,controller(&app).diagnostics())\n        .map_err(|e| format!(\"导出诊断日志失败（{}）：{e}\",destination.display()))?;\n    Ok(destination.to_string_lossy().to_string())\n}\n\n// Open only official GitHub release URLs in the system browser. Never run installers.\n#[tauri::command]\nfn open_release_page(url: String) -> Result<(),String> {\n    let tail = url.strip_prefix(\"https://github.com/\").ok_or(\"仅允许 GitHub Release 下载页\")?;\n    let parts:Vec<&str> = tail.split('/').collect();\n    let valid = parts.len() == 5 && parts[2] == \"releases\" && parts[3] == \"tag\" &&\n        parts[0] == \"rfw\" && parts[1] == \"Airpimo\" &&\n        { let version=parts[4].strip_prefix('v').unwrap_or(parts[4]);\n          version.split('.').count() == 3 && version.split('.').all(|p| !p.is_empty() && p.bytes().all(|c| c.is_ascii_digit())) }; \n    if !valid { return Err(\"更新链接必须是官方仓库的稳定版 GitHub Release\".into()); }\n    #[cfg(target_os=\"windows\")]\n    let result = std::process::Command::new(\"rundll32.exe\").arg(\"url.dll,FileProtocolHandler\").arg(&url).spawn();\n    #[cfg(target_os=\"macos\")]\n    let result = std::process::Command::new(\"open\").arg(&url).spawn();\n    #[cfg(not(any(target_os=\"windows\",target_os=\"macos\")))]\n    let result = std::process::Command::new(\"xdg-open\").arg(&url).spawn();\n    result.map(|_| ()).map_err(|e| format!(\"无法打开系统浏览器：{e}\"))\n}\n\n// Brand migration: existing UxPlay Desktop users retain their saved receiver settings.\n"
+    },
+    {
+     "before": "            if should_start { core.start(app.handle(),true); }\n            Ok(())\n        })\n        .invoke_handler(tauri::generate_handler![get_snapshot,get_settings,start_receiving,stop_receiving,retry_receiving,save_settings,get_diagnostics,export_diagnostics])\n        .on_window_event(|window,event| {\n            if let WindowEvent::CloseRequested {api,..}=event {\n                let app=window.app_handle();\n",
+     "after": "            if should_start { core.start(app.handle(),true); }\n            Ok(())\n        })\n        .invoke_handler(tauri::generate_handler![get_snapshot,get_settings,start_receiving,stop_receiving,retry_receiving,save_settings,get_diagnostics,export_diagnostics,open_release_page])\n        .on_window_event(|window,event| {\n            if let WindowEvent::CloseRequested {api,..}=event {\n                let app=window.app_handle();\n"
+    }
+   ]
+  },
+  {
+   "path": "src-tauri/tauri.conf.json",
+   "hunks": [
+    {
+     "before": "      }\n    ],\n    \"security\": {\n      \"csp\": \"default-src 'self' asset: http://asset.localhost; img-src 'self' data: asset: http://asset.localhost; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost\"\n    }\n  },\n  \"bundle\": {\n",
+     "after": "      }\n    ],\n    \"security\": {\n      \"csp\": \"default-src 'self' asset: http://asset.localhost; img-src 'self' data: asset: http://asset.localhost; style-src 'self' 'unsafe-inline'; connect-src ipc: http://ipc.localhost https://api.github.com\"\n    }\n  },\n  \"bundle\": {\n"
+    }
+   ]
+  },
+  {
+   "path": "tests/airpimo-brand.test.mjs",
+   "hunks": [
+    {
+     "before": "    assert.match(rust,/fn export_diagnostics\\(app:AppHandle\\)/);\n    assert.match(rust,/let filename=format!\\(\"airpimo-diagnostics-/);\n    assert.match(rust,/std::fs::write\\(&destination,controller\\(&app\\)\\.diagnostics\\(\\)\\)/);\n    assert.match(rust,/save_settings,get_diagnostics,export_diagnostics\\]/);\n  } else {\n    // Keep older v19/v21 snapshot tests useful for pre-v23 source trees.\n    assert.match(app,/airpimo-diagnostics-/);\n",
+     "after": "    assert.match(rust,/fn export_diagnostics\\(app:AppHandle\\)/);\n    assert.match(rust,/let filename=format!\\(\"airpimo-diagnostics-/);\n    assert.match(rust,/std::fs::write\\(&destination,controller\\(&app\\)\\.diagnostics\\(\\)\\)/);\n    assert.match(rust,/save_settings,get_diagnostics,export_diagnostics(?:,open_release_page)?\\]/);\n  } else {\n    // Keep older v19/v21 snapshot tests useful for pre-v23 source trees.\n    assert.match(app,/airpimo-diagnostics-/);\n"
+    }
+   ]
+  },
+  {
+   "path": "tests/airpimo-home-ui.test.mjs",
+   "hunks": [
+    {
+     "before": "  const home=read('src/components/AirpimoHome.tsx');\n  const status=read('src/domain/home-status.ts');\n  assert.match(home,/aria-label=\"打开设置\"/);\n  assert.match(home,/aria-label=\"查看诊断\"/);\n  assert.match(home,/v\\{brand\\.version\\}/);\n  assert.match(home,/aria-live=\\{statusTone === 'error'/);\n  assert.match(home,/const statusLabel = serviceError \\? status\\.label : feedback/);\n",
+     "after": "  const home=read('src/components/AirpimoHome.tsx');\n  const status=read('src/domain/home-status.ts');\n  assert.match(home,/aria-label=\"打开设置\"/);\n  assert.doesNotMatch(home,/aria-label=\"查看诊断\"/);\n  assert.match(read('src/App.tsx'),/airpimo-tab-diagnostics/);\n  assert.match(home,/v\\{brand\\.version\\}/);\n  assert.match(home,/aria-live=\\{statusTone === 'error'/);\n  assert.match(home,/const statusLabel = serviceError \\? status\\.label : feedback/);\n"
+    }
+   ]
+  },
+  {
+   "path": "tests/airpimo-startup-tray-dev-v22.test.mjs",
+   "hunks": [
+    {
+     "before": "  assert.match(read('src/domain/state.ts'),/stay_in_tray:true, theme:'system'/);\n  assert.match(read('src-tauri/src/settings.rs'),/pub stay_in_tray: bool/);\n  assert.match(read('src/App.tsx'),/checked=\\{draft.stay_in_tray\\}/);\n  assert.match(read('src/App.tsx'),/默认开启：关闭窗口后继续在托盘接收/);\n});\n\ntest('theme bootstrap runs before React and works for persisted dark, system dark and light',()=>{\n",
+     "after": "  assert.match(read('src/domain/state.ts'),/stay_in_tray:true, theme:'system'/);\n  assert.match(read('src-tauri/src/settings.rs'),/pub stay_in_tray: bool/);\n  assert.match(read('src/App.tsx'),/checked=\\{draft.stay_in_tray\\}/);\n  assert.match(read('src/App.tsx'),/新安装默认开启，关闭主窗口后仍继续接收/);\n});\n\ntest('theme bootstrap runs before React and works for persisted dark, system dark and light',()=>{\n"
+    }
+   ]
+  },
+  {
+   "path": "tests/airpimo-v23-modal-tray-export.test.mjs",
+   "hunks": [
+    {
+     "before": "test('v23 has been applied completely and is idempotent',()=> {\n  assert.deepEqual([...plan(root)], []);\n});\ntest('both native dialogs fill the available window; mac title header remains exposed',()=> {\n  const app=file('src/App.tsx'), css=file('src/styles/airpimo-dialogs.css');\n  assert.match(app, /DialogContent className=\\{dialogClass\\} overlayClassName=\\{overlayClass\\}/);\n  assert.equal((app.match(/DialogContent className=\\{dialogClass\\}/g) ?? []).length, 2);\n  assert.match(css, /\\.airpimo-full-dialog\\.is-macos\\s*\\{[^}]*top: 46px[^}]*height: calc\\(100vh - 46px\\)/);\n  assert.match(css, /\\.airpimo-modal-overlay\\.is-macos\\s*\\{ top: 46px/);\n  assert.match(css, /\\.airpimo-full-dialog > \\.diagnostics-text/);\n",
+     "after": "test('v23 has been applied completely and is idempotent',()=> {\n  assert.deepEqual([...plan(root)], []);\n});\ntest('settings contains diagnostics, fills available window and preserves mac title header',()=> {\n  const app=file('src/App.tsx'), css=file('src/styles/airpimo-dialogs.css');\n  assert.match(app, /DialogContent className=\\{`\\$\\{dialogClass\\} airpimo-settings-dialog`\\} overlayClassName=\\{overlayClass\\}/);\n  assert.equal((app.match(/<Dialog open=/g) ?? []).length, 1);\n  assert.match(app, /airpimo-panel-diagnostics/);\n  assert.match(css, /\\.airpimo-full-dialog\\.is-macos\\s*\\{[^}]*top: 46px[^}]*height: calc\\(100vh - 46px\\)/);\n  assert.match(css, /\\.airpimo-modal-overlay\\.is-macos\\s*\\{ top: 46px/);\n  assert.match(css, /\\.airpimo-full-dialog > \\.diagnostics-text/);\n"
+    },
+    {
+     "before": "  assert.match(lib,/fn export_diagnostics\\(app:AppHandle\\) -> Result<String,String>/);\n  assert.match(lib,/app\\.path\\(\\)\\.download_dir\\(\\)/);\n  assert.match(lib,/std::fs::write\\(&destination,controller\\(&app\\)\\.diagnostics\\(\\)\\)/);\n  assert.match(lib,/save_settings,get_diagnostics,export_diagnostics\\]/);\n});\ntest('Windows double-click and macOS left-click restore main without changing quit/tray policy',()=> {\n  const lib=file('src-tauri/src/lib.rs');\n",
+     "after": "  assert.match(lib,/fn export_diagnostics\\(app:AppHandle\\) -> Result<String,String>/);\n  assert.match(lib,/app\\.path\\(\\)\\.download_dir\\(\\)/);\n  assert.match(lib,/std::fs::write\\(&destination,controller\\(&app\\)\\.diagnostics\\(\\)\\)/);\n  assert.match(lib,/save_settings,get_diagnostics,export_diagnostics,open_release_page\\]/);\n});\ntest('Windows double-click and macOS left-click restore main without changing quit/tray policy',()=> {\n  const lib=file('src-tauri/src/lib.rs');\n"
+    }
+   ]
+  },
+  {
+   "path": "vite.config.ts",
+   "hunks": [
+    {
+     "before": "import { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';\n\nexport default defineConfig({\n  plugins: [react()],\n  clearScreen: false,\n  server: { host: '127.0.0.1', port: 1420, strictPort: true },\n  envPrefix: ['VITE_'],\n",
+     "after": "import { defineConfig } from 'vite';\nimport react from '@vitejs/plugin-react';\n\nexport default defineConfig({\n  plugins: [react()],\n  define: { __AIRPIMO_RELEASE_REPO__: JSON.stringify('rfw/Airpimo') },\n  clearScreen: false,\n  server: { host: '127.0.0.1', port: 1420, strictPort: true },\n  envPrefix: ['VITE_'],\n"
+    }
+   ]
+  }
+ ],
+ "assets": [
+  {
+   "path": "src/lib/release-update.ts",
+   "sha256": "3732f3d377a8b61731fa72c99eeaa1154f4d2736c46a268ab1cad8c9379f93af"
+  },
+  {
+   "path": "src/styles/airpimo-settings-tabs.css",
+   "sha256": "3b627cb8d329c029dfb5f061b2234d8a63a5cd287476fb0bb161243c986c32a0"
+  },
+  {
+   "path": "tests/airpimo-v25-updates.test.mjs",
+   "sha256": "3b41e08836294ca97d1fa85745e4894f1d522ccf2dbe76b6ee3de752f33b6057"
+  }
+ ]
+}

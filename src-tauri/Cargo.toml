@@ -1,0 +1,31 @@
+[package]
+name = "airpimo"
+version = "0.1.8"
+description = "Airpimo desktop AirPlay receiver"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/rfw/Airpimo"
+edition = "2021"
+build = "build.rs"
+rust-version = "1.77.2"
+
+[lib]
+name = "airpimo_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+# Tauri 2.11.1 official matching internal-crate release family.
+# Without explicit constraints Cargo can resolve tauri-runtime 2.12.0,
+# whose monitor APIs break tauri 2.11.1 at compile time.
+# Do not upgrade any of these individually: Win7 support is a candidate gate.
+[build-dependencies]
+tauri-build = { version = "=2.6.1", features = [] }
+tauri-codegen = { version = "=2.6.1", default-features = false }
+
+[dependencies]
+tauri = { version = "=2.11.1", features = ["tray-icon", "image-png"] }
+tauri-runtime = "=2.11.1"
+tauri-runtime-wry = { version = "=2.11.1", default-features = false }
+tauri-utils = "=2.9.1"
+tauri-macros = "=2.6.1"
+tauri-plugin-single-instance = "=2.3.7"
+serde = { version = "=1.0.219", features = ["derive"] }
+serde_json = "=1.0.140"

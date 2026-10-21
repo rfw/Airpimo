@@ -1,0 +1,24 @@
+Airpimo - Third-party software notices
+=====================================
+
+Airpimo's own eligible source code is licensed under GPL-3.0-or-later (see LICENSE).
+This LICENSE does not supersede the original licenses of bundled third-party works.
+
+UxPlay (AirPlay receiving engine)
+  Project: https://github.com/FDH2/UxPlay
+  License: GPL version 3 or later, subject to the original source headers.
+  Portions originate in RPiPlay, with separate copyright holders.
+  When distributing binaries, make available the corresponding source,
+  any distributed modifications, and the build/install information required
+  by the applicable GPL terms for the exact distributed version.
+
+GStreamer and plugins
+  Project: https://gstreamer.freedesktop.org/
+  Core and many libraries/plugins are LGPL; some plugins and dependencies
+  have other licenses. Audit the exact bundled modules and codec rights.
+
+Microsoft WebView2 Runtime
+  Original vendor licensing applies. It is not relicensed under Airpimo GPL.
+
+A release-specific SBOM, binary inventory, source-offer instructions and
+original copyright notices must be provided for the actual release artifacts.

@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "upstream": "https://github.com/FDH2/UxPlay.git",
+  "track": "1.74-experimental",
+  "target": "win32-x64",
+  "commit": "a3c064d9111c67a3fc35d5d1e7fbced8712f649a",
+  "buildFlags": [
+    "-DNO_MARCH_NATIVE=ON",
+    "-DUSE_DNS_SD=OFF",
+    "-DUSE_MDNS=ON"
+  ]
+}

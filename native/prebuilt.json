@@ -1,0 +1,5 @@
+{
+  "schema": 1,
+  "description": "Optional trusted UxPlay executable distribution. Register HTTPS URLs and SHA-256 only after producing and reviewing each binary. No fabricated release URLs.",
+  "targets": {}
+}
