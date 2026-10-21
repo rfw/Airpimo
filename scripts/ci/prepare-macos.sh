@@ -35,6 +35,6 @@ npm run native:bundle:from-build -- --gst "$BREW_PREFIX" --gst-scanner "$SCANNER
 # Retain only AirPlay GStreamer elements and their full Mach-O dylib closure.
 # This avoids unrelated Python/Node/HTTP/etc libraries bloating or blocking DMGs.
 npm run native:prune:mac -- --gst "$BREW_PREFIX" --apply
-# Compile in-process macOS GStreamer window controls.
+# Compile title-only helper; native macOS fullscreen stays enabled without custom overlays.
 bash scripts/ci/build-macos-fullscreen.sh "$TARGET"
 # Staged binaries are still checked and relocated in a separate release gate.

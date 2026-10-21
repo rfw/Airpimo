@@ -168,6 +168,10 @@ impl Controller {
             Ok(child)=>child,
             Err(err)=>{ self.error(app,epoch,"missing_binary", &format!("UxPlay 无法启动：{err}")); return self.snapshot(); }
         };
+        // Only observe video windows owned by the newly spawned UxPlay child.
+        // No global Windows message hooks or user input capture is installed.
+        #[cfg(windows)]
+        crate::windows_player::watch(child.id());
         let stdout=child.stdout.take(); let stderr=child.stderr.take();
         {
             let mut i=self.inner.lock().unwrap();
@@ -456,11 +460,11 @@ fn setup_mac_video_controls(app: &AppHandle, command: &mut Command, development:
     };
     if !shipped.is_file() {
         if development { return Ok(()); }
-        return Err("安装包缺少 macOS 播放器全屏原生扩展，请重新生成完整版安装包".into());
+        return Err("安装包缺少 macOS 播放窗口标题原生扩展，请重新生成完整版安装包".into());
     }
     // Do not inherit untrusted DYLD_INSERT_LIBRARIES. Only the version built
     // into this installation is loaded, and only by this UxPlay child process.
     command.env("DYLD_INSERT_LIBRARIES", shipped);
-    command.env("UXPLAY_DESKTOP_FULLSCREEN_CHILD", "1");
+    command.env("AIRPIMO_PLAYER_TITLE_CHILD", "1");
     Ok(())
 }

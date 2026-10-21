@@ -2,7 +2,7 @@
  * The standard Tauri bundle output path is shared; copying to distinct
  * release folders avoids losing the first installer after the second build.
  */
-import {copyFileSync, mkdirSync, readdirSync, statSync} from 'node:fs';
+import {copyFileSync, mkdirSync, readdirSync, statSync, readFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 
 export function preserveNsisInstaller(root, target, startedAtMs = 0) {
@@ -18,7 +18,9 @@ export function preserveNsisInstaller(root, target, startedAtMs = 0) {
   mkdirSync(dst, {recursive: true});
   const source = matches[0];
   const stem = source.name.replace(/\.exe$/i, '');
-  const result = join(dst, `${stem}-${target}.exe`);
+  // Keep internal candidate folders stable while using the public Win10/11 label.
+  const filename = target === 'win10plus' ? `Airpimo_${JSON.parse(readFileSync(join(root, 'package.json'),'utf8')).version}_windows10-11plus-x64.exe` : `${stem}-${target}.exe`;
+  const result = join(dst, filename);
   copyFileSync(source.path, result);
   return result;
 }

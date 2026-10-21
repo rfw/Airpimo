@@ -18,7 +18,7 @@ export interface Snapshot {
   restart_attempts: number;
   settings: Settings;
 }
-export const defaultSettings: Settings = {device_name: 'Airpimo', auto_start:true, stay_in_tray:true, theme:'system', fps:60, brightness:80, uxplay_args:''};
+export const defaultSettings: Settings = {device_name: 'Airpimo', auto_start:true, stay_in_tray:true, theme:'system', fps:60, brightness:100, uxplay_args:''};
 export const defaultSnapshot: Snapshot = {stage:'stopped', detail:'接收服务尚未启动', issue:null, device_name:'Airpimo', applied_device_name:null, applied_fps:null, applied_brightness:null, applied_uxplay_args:null, process_running:false, discovery_verified:false, audio_verified:false, connected_since:null, restart_attempts:0, settings:defaultSettings};
 export const stageTitle: Record<Stage, string> = {
   stopped:'接收已停止', starting:'正在启动', waiting:'等待连接', connecting:'正在连接', connected:'已连接', error:'接收出现问题'

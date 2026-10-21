@@ -50,8 +50,8 @@ test('FPS changes prompt restart only while receiver is running',()=>{
 });
 
 
-test('brightness 80% default and strict range',()=>{
-  assert.equal(defaultSnapshot.settings.brightness,80);
+test('brightness 100% default and strict range',()=>{
+  assert.equal(defaultSnapshot.settings.brightness,100);
   for (const x of [0,5,50,80,95,100]) assert.equal(validateBrightness(x),null);
   for (const x of [-1,101,80.5,NaN,Infinity]) assert.ok(validateBrightness(x));
 });

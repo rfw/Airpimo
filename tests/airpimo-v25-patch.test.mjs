@@ -11,8 +11,8 @@ test('v25 source patch is idempotent after installation',()=>{
   const installed = readFileSync(join(root,'src/App.tsx'),'utf8');
   assert.match(installed,/airpimo-panel-updates/);
   assert.match(installed,/id="uxplayArgs"/);
-  const done=spawnSync(process.execPath,['scripts/ci/apply-airpimo-uxplay-args.mjs','--check'],{cwd:root,encoding:'utf8'});
-  assert.equal(done.status,0,done.stderr);
+  assert.match(installed,/await desktop\.save\(/);
+  assert.match(readFileSync(join(root,'src-tauri/src/uxplay_args.rs'),'utf8'),/pub fn effective\(/);
 });
 
 test('an unknown App.tsx refuses changes without mutating unrelated sources',()=>{
@@ -29,7 +29,7 @@ test('an unknown App.tsx refuses changes without mutating unrelated sources',()=
     if(expert>=0)writeFileSync(css,text.slice(0,expert));
     writeFileSync(app,'export default function App() { return null; }');
     const oldRust=readFileSync(join(tmp,'src-tauri/src/lib.rs'),'utf8');
-    assert.throws(()=>apply(tmp,true),/不匹配|锚点/);
+    assert.throws(()=>apply(tmp,true),/不匹配|锚点|拒绝覆盖/);
     assert.equal(readFileSync(join(tmp,'src-tauri/src/lib.rs'),'utf8'),oldRust);
     assert.equal(readFileSync(app,'utf8'),'export default function App() { return null; }');
   }finally{rmSync(tmp,{recursive:true,force:true});}

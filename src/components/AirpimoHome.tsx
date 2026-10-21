@@ -30,7 +30,8 @@ export function AirpimoHome({snapshot, ready, busy, now, bootError, feedback, on
   onRetry, onCopy, onSettings, onClearFeedback, updateAvailable}: AirpimoHomeProps) {
   const macOS = isMacOS();
   const active = snapshot.process_running;
-  const name = active ? (snapshot.applied_device_name ?? snapshot.settings.device_name) : snapshot.settings.device_name;
+  const baseName = active ? (snapshot.applied_device_name ?? snapshot.settings.device_name) : snapshot.settings.device_name;
+  const name = `${baseName.replace(/@Airpimo$/, '')}@Airpimo`;
   const status = homeStatus(snapshot, ready, bootError, now);
   const starting = snapshot.stage === 'starting';
   const retry = snapshot.stage === 'error' && !active;

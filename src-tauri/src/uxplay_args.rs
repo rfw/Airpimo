@@ -64,6 +64,13 @@ fn push_default(args: &mut Vec<String>, custom: &[String], key: &str, value: Opt
     }
 }
 
+/// The receiver's advertised name is always <configured base>@Airpimo.
+/// -nh prevents UxPlay from adding the host computer name a second time.
+pub fn advertised_name(name: &str) -> String {
+    let base = name.trim().strip_suffix("@Airpimo").unwrap_or(name.trim());
+    format!("{base}@Airpimo")
+}
+
 /// Build the canonical effective argv; never depend on UxPlay's behavior with
 /// duplicate flags. Explicit UI-owned flags are always applied once at the end.
 pub fn effective(name: &str, fps: u16, brightness: u8, user: &str) -> Result<Vec<String>, String> {
@@ -79,14 +86,14 @@ pub fn effective(name: &str, fps: u16, brightness: u8, user: &str) -> Result<Vec
     let mut i = 0;
     while i < custom.len() {
         let token = &custom[i];
-        if ["-n", "-fps", "-vc"].contains(&flag_key(token).to_ascii_lowercase().as_str()) {
+        if ["-n", "-fps", "-vc", "-nh"].contains(&flag_key(token).to_ascii_lowercase().as_str()) {
             // Strip both the conflicting option and its optional separate value.
             // Do not eat the next flag if the caller omitted the value.
-            if !token.contains('=') && i + 1 < custom.len() && !is_option(&custom[i + 1]) { i += 1; }
+            if flag_key(token) != "-nh" && !token.contains('=') && i + 1 < custom.len() && !is_option(&custom[i + 1]) { i += 1; }
         } else { args.push(token.clone()); }
         i += 1;
     }
-    args.extend(["-n".into(), name.into(), "-fps".into(), fps.to_string()]);
+    args.extend(["-nh".into(), "-n".into(), advertised_name(name), "-fps".into(), fps.to_string()]);
     if brightness < 100 {
         args.push("-vc".into());
         args.push(format!("videoconvert ! videobalance brightness={}", crate::settings::videobalance_brightness(brightness)));

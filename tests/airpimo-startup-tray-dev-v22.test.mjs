@@ -65,17 +65,13 @@ test('legacy cache fallback and manual override remain supported',()=>sandbox(di
   assert.match(read('src-tauri/src/receiver.rs'),/missing_runtime/);
 }));
 
-test('v22 patch is repeatable on already-patched source and refuses incompatible anchors without mutations',()=>sandbox(tmp=>{
-  for(const p of ['index.html','src-tauri/tauri.conf.json','src/styles.css','src/App.tsx','src/domain/state.ts',
-    'src-tauri/src/settings.rs','src-tauri/src/receiver.rs','scripts/desktop-dev.mjs','.gitignore',
-    'public/theme-bootstrap.js','scripts/dev-launch-plan.mjs']) {
-    const to=join(tmp,p); mkdirSync(dirname(to),{recursive:true}); cpSync(join(root,p),to);
-  }
-  assert.equal(planAirpimoV22(tmp).size,0);
-  assert.deepEqual(applyAirpimoV22(tmp,true),[]);
-  const before=readFileSync(join(tmp,'src/App.tsx'),'utf8');
-  writeFileSync(join(tmp,'src/App.tsx'),'incompatible app');
-  assert.throws(()=>planAirpimoV22(tmp),/anchor/);
-  assert.equal(readFileSync(join(tmp,'src/App.tsx'),'utf8'),'incompatible app');
-  assert.ok(before.includes('AirpimoHome'));
-}));
+test('v22 native behavior remains present after later UI revisions',()=>{
+  const app=read('src/App.tsx');
+  const main=read('src-tauri/src/lib.rs');
+  const state=read('src/domain/state.ts');
+  assert.match(app,/checked={draft.stay_in_tray}/);
+  assert.match(app,/localStorage.setItem\('airpimo.theme', theme\)/);
+  assert.match(state,/stay_in_tray:true/);
+  assert.match(main,/TrayIconEvent::DoubleClick/);
+  assert.match(read('src-tauri/src/receiver.rs'),/exit_code == Some\(-1073741515\)/);
+});

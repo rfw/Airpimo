@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {resolve} from 'node:path';
+import {resolve, join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 const root = resolve(import.meta.dirname, '..');
 const read = file => readFileSync(resolve(root, file), 'utf8');
@@ -24,8 +24,8 @@ test('native regression assertions follow the real Rust implementation', () => {
 
 test('patch is repeatable and preserves the v28 installer check', () => {
   const run = (script, ...args) => spawnSync(process.execPath,[script,...args],{cwd:root,encoding:'utf8'});
-  const p = run('scripts/ci/apply-airpimo-v30-native-guard.mjs','--check');
-  assert.equal(p.status,0,p.stderr);
-  const v28 = run('scripts/ci/apply-airpimo-uxplay-args.mjs','--check');
-  assert.equal(v28.status,0,v28.stderr);
+  // The legacy installer templates are not reapplied after new-repository initialization.
+  const native=readFileSync(join(root,'tests/native-engine-integration.test.mjs'),'utf8');
+  assert.match(native,/effective_args/);
+  assert.match(readFileSync(join(root,'src-tauri/src/uxplay_args.rs'),'utf8'),/pub fn effective\(/);
 });

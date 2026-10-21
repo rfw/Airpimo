@@ -87,7 +87,7 @@ test('tag release is the sole GitHub workflow and uses hosted runners with sourc
   assert.doesNotMatch(release,/workflow_dispatch:/);
   assert.match(release,/runs-on: windows-2022/g);
   assert.match(release,/runs-on: macos-15-intel/);
-  assert.match(release,/runs-on: macos-15\n/);
+  assert.match(release,/runs-on: macos-15\r?\n/);
   assert.doesNotMatch(release,/runs-on: \[self-hosted/);
   assert.doesNotMatch(release,/UXPLAY_WINDOWS_SOURCE_DIR|UXPLAY_MACOS_INTEL_SOURCE_DIR|ci-selfhost-stage\.mjs/);
   assert.doesNotMatch(release,/UXPLAY_NATIVE_RELEASE_TAG|ci-reviewed-asset/);

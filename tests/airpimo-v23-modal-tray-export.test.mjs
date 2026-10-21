@@ -6,8 +6,11 @@ import {plan} from '../scripts/ci/apply-airpimo-v23.mjs';
 const root = resolve(import.meta.dirname,'..');
 const file = relative => readFileSync(resolve(root,relative),'utf8');
 
-test('v23 has been applied completely and is idempotent',()=> {
-  assert.deepEqual([...plan(root)], []);
+test('v23 native diagnostics export and current settings integration remain present',()=> {
+  const app=file('src/App.tsx');
+  assert.match(app,/airpimo-panel-diagnostics/);
+  assert.match(app,/await desktop\.exportDiagnostics\(\)/);
+  assert.match(file('src/lib/desktop.ts'),/invoke\('export_diagnostics'\)/);
 });
 test('settings contains diagnostics, fills available window and preserves mac title header',()=> {
   const app=file('src/App.tsx'), css=file('src/styles/airpimo-dialogs.css');

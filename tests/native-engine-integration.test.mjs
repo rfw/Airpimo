@@ -100,7 +100,7 @@ test('brightness is backed by real UxPlay -vc videobalance and retains Windows A
   assert.match(receiver,/let effective_args = match crate::uxplay_args::effective\(&name, fps, brightness, &user_args\)/);
   assert.match(receiver,/command\.args\(&effective_args\)/);
   assert.match(settings,/serde\(default = "default_brightness"\)/);
-  assert.match(settings,/pub const fn default_brightness\(\) -> u8 \{ 80 \}/);
+  assert.match(settings,/pub const fn default_brightness\(\) -> u8 \{ 100 \}/);
   assert.match(app,/aria-label="画面亮度" type="range"/);
   assert.doesNotMatch(receiver,/"-vsync", "no"\]\);\s*\/\/.*windows/);
 });

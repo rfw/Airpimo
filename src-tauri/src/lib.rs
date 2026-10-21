@@ -2,6 +2,8 @@ mod diagnostic;
 mod receiver;
 mod settings;
 mod uxplay_args;
+#[cfg(windows)]
+mod windows_player;
 
 use std::{path::PathBuf, sync::Arc};
 use receiver::{Controller, Snapshot};
@@ -103,7 +105,21 @@ fn init_tray(app:&mut tauri::App) -> tauri::Result<()> {
     Ok(())
 }
 
+#[cfg(windows)]
+fn configure_windows_taskbar_id() {
+    use std::{ffi::OsStr, os::windows::ffi::OsStrExt};
+    #[link(name = "shell32")]
+    extern "system" {
+        fn SetCurrentProcessExplicitAppUserModelID(app_id: *const u16) -> i32;
+    }
+    let name: Vec<u16> = OsStr::new("com.airpimo.desktop")
+        .encode_wide().chain(Some(0)).collect();
+    unsafe { SetCurrentProcessExplicitAppUserModelID(name.as_ptr()); }
+}
+
 pub fn run() {
+    #[cfg(windows)]
+    configure_windows_taskbar_id();
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app,_,_| show_main(app)))
         .on_tray_icon_event(|app,event| {
@@ -123,6 +139,12 @@ pub fn run() {
             let core=Controller::new(path);
             let should_start=core.settings().auto_start;
             app.manage(core.clone());
+            #[cfg(windows)]
+            if let Some(window) = app.get_webview_window("main") {
+                if let Some(icon) = app.default_window_icon() {
+                    let _ = window.set_icon(icon.clone());
+                }
+            }
             init_tray(app)?;
             if should_start { core.start(app.handle(),true); }
             Ok(())

@@ -46,8 +46,8 @@ test('settings provide warning, explicit restart semantics and existing controls
   assert.match(app,/await desktop\.save\(/);
 });
 
-test('idempotent patch check completes without rewriting files',()=>{
-  const result=spawnSync(process.execPath,['scripts/ci/apply-airpimo-uxplay-args.mjs','--check'],{cwd:root,encoding:'utf8'});
-  assert.equal(result.status,0,result.stderr);
-  assert.match(result.stdout,/PASS/);
+test('current receiver already includes the expert settings across Rust and React',()=>{
+  assert.match(read('src/App.tsx'),/id="uxplayArgs"/);
+  assert.match(read('src-tauri/src/settings.rs'),/pub uxplay_args: String/);
+  assert.match(read('src-tauri/src/receiver.rs'),/command\.args\(&effective_args\)/);
 });

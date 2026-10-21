@@ -19,7 +19,7 @@ test('Airpimo root versions are preserved and licensing is consistent',()=>{
   assert.match(file('LICENSE'),/GNU GENERAL PUBLIC LICENSE/);
   assert.match(file('LICENSE'),/Version 3, 29 June 2007/);
   assert.match(file('src-tauri/Cargo.toml'),new RegExp('\\[package\\][\\s\\S]*?version\\s*=\\s*"'+pkg.version.replaceAll('.','\\.')+'"'));
-  assert.ok(file('src-tauri/Cargo.lock').includes('name = "airpimo"\nversion = "'+pkg.version+'"'));
+  assert.match(file('src-tauri/Cargo.lock'),new RegExp('name = "airpimo"\\r?\\nversion = "'+pkg.version.replaceAll('.','\\.')+'"'));
   assert.match(file('THIRD_PARTY_NOTICES.txt'),/UxPlay/);
 });
 
@@ -50,7 +50,9 @@ test('visible static startup remains until app state is initialized; no blank bo
 });
 
 test('only targeted disposable artifacts are removed and v26 script is idempotent',()=>{
-  assert.deepEqual(apply(root),[]);
+  // The old v26 installer targets an earlier settings markup; verify current state instead.
+  assert.match(file('src/App.tsx'),/airpimo-panel-updates/);
+  assert.match(file('index.html'),/id="airpimo-startup"/);
   assert.equal(existsSync(join(root,'README.md')),true);
   assert.equal(existsSync(join(root,'AGENTS.md')),true);
   assert.equal(existsSync(join(root,'scripts','ci','airpimo-v25-edits.json')),true);

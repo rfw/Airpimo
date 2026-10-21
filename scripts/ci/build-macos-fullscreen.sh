@@ -24,4 +24,4 @@ lipo -archs "$OUT" | grep -qx "$ARCH" || { echo 'BLOCKED: incorrect helper archi
 if command -v vtool >/dev/null; then
   vtool -show-build "$OUT" | grep -A 2 'platform MACOS' || true
 fi
-printf 'PASS: compiled child-process fullscreen controls (%s): %s\n' "$ARCH" "$OUT"
+printf 'PASS: compiled child-process Airpimo Player title helper (%s): %s\n' "$ARCH" "$OUT"

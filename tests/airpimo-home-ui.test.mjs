@@ -33,7 +33,8 @@ test('Windows native titlebar remains; macOS HTML Header is conditional and over
 test('home UI contains only one real start/stop action and preserves the live receiver name',()=>{
   const home=read('src/components/AirpimoHome.tsx');
   const app=read('src/App.tsx');
-  assert.match(home,/const name = active \? \(snapshot\.applied_device_name \?\? snapshot\.settings\.device_name\) : snapshot\.settings\.device_name;/);
+  assert.match(home,/const baseName = active \? \(snapshot\.applied_device_name \?\? snapshot\.settings\.device_name\) : snapshot\.settings\.device_name;/);
+  assert.match(home,/const name = `\$\{baseName\.replace\(\/@Airpimo\$\/, ''\)\}@Airpimo`/);
   assert.match(home,/const onPrimaryAction = active \? onStop : retry \? onRetry : onStart;/);
   assert.match(home,/const label = active \? '停止接收' : '开始接收';/);
   assert.match(home,/disabled=\{disabled\}/);

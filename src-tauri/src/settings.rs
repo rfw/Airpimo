@@ -20,8 +20,8 @@ pub struct Settings {
 }
 pub const fn default_fps() -> u16 { 60 }
 // Relative picture-darkening control, not the physical screen backlight.
-// 100 keeps the original video pipeline; 80 maps to GStreamer -0.20.
-pub const fn default_brightness() -> u8 { 80 }
+// New installs default to unchanged video brightness (100%). Existing saved values remain unchanged.
+pub const fn default_brightness() -> u8 { 100 }
 pub fn validate_brightness(value: u8) -> Result<(), String> {
     if value <= 100 { Ok(()) } else { Err("画面亮度必须为 0–100%".into()) }
 }
@@ -97,11 +97,11 @@ mod tests {
         assert!(!settings.auto_start);
         assert!(settings.stay_in_tray);
         assert_eq!(settings.fps, 60);
-        assert_eq!(settings.brightness, 80);
+        assert_eq!(settings.brightness, 100);
         assert_eq!(settings.uxplay_args, "");
     }
     #[test] fn picture_brightness_mapping_and_boundaries() {
-        assert_eq!(default_brightness(), 80);
+        assert_eq!(default_brightness(), 100);
         assert_eq!(videobalance_brightness(100), "-0.00");
         assert_eq!(videobalance_brightness(80), "-0.20");
         assert_eq!(videobalance_brightness(50), "-0.50");

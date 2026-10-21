@@ -30,6 +30,7 @@ test('separate build scripts use explicit selected configs and protect native ma
 test('distinct build outputs are preserved without touching the original NSIS file',()=> {
   const temp=mkdtempSync(join(tmpdir(),'uxplay-win-targets-'));
   try {
+    writeFileSync(join(temp,'package.json'), JSON.stringify({version:'0.1.0'}));
     const src=join(temp,'src-tauri','target','release','bundle','nsis');
     mkdirSync(src,{recursive:true});
     writeFileSync(join(src,'Airpimo_0.1.4_x64-setup.exe'),'fixture');
