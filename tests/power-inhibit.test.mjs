@@ -38,3 +38,16 @@ test("power inhibitor is acquired only on active mirroring and is released on li
   assert.match(receiver, /i\.stage="waiting";[\s\S]*?i\.log\("mirror_ended"\)/);
   assert.match(receiver, /fn diagnostics\(&self\) -> String/);
 });
+
+
+test("PowerInhibitor intentionally holds a Drop guard and Win32 HANDLE FFI agrees with other modules", () => {
+  const power = source("src-tauri/src/power_inhibit.rs");
+  const player = source("src-tauri/src/windows_player.rs");
+  assert.match(power, /struct PowerInhibitor\s*\{\s*_request:\s*platform::PowerRequest,/);
+  assert.match(power, /\.map\(\|request\| Self \{ _request: request \}\)/);
+  assert.match(power, /type Handle = isize;/);
+  assert.match(player, /type Handle = isize;/);
+  assert.match(power, /fn CloseHandle\(handle: Handle\) -> i32;/);
+  assert.match(player, /fn CloseHandle\(handle: Handle\) -> i32;/);
+  assert.doesNotMatch(power, /type Handle = \*mut c_void;/);
+});

@@ -3,11 +3,14 @@
 //! User-requested sleep, laptop lid closure, and critical battery/thermal
 //! protection are deliberately not overridden.
 
-pub(crate) struct PowerInhibitor(platform::PowerRequest);
+// The field is intentionally only held, never read: its Drop releases the OS request.
+pub(crate) struct PowerInhibitor {
+    _request: platform::PowerRequest,
+}
 
 impl PowerInhibitor {
     pub(crate) fn acquire() -> Result<Self, String> {
-        platform::PowerRequest::acquire().map(Self)
+        platform::PowerRequest::acquire().map(|request| Self { _request: request })
     }
 }
 
@@ -15,9 +18,11 @@ impl PowerInhibitor {
 // (which would require keeping the same worker thread alive indefinitely).
 #[cfg(windows)]
 mod platform {
-    use std::{ffi::c_void, io, os::windows::ffi::OsStrExt};
+    use std::{io, os::windows::ffi::OsStrExt};
 
-    type Handle = *mut c_void;
+    // Match the platform-wide HANDLE representation in windows_player.rs.
+    // All Win32 HANDLEs are pointer-sized, including on 32-bit targets.
+    type Handle = isize;
     const POWER_REQUEST_CONTEXT_VERSION: u32 = 0;
     const POWER_REQUEST_CONTEXT_SIMPLE_STRING: u32 = 1;
     const POWER_REQUEST_DISPLAY_REQUIRED: u32 = 0;
@@ -53,8 +58,8 @@ mod platform {
         fn CloseHandle(handle: Handle) -> i32;
     }
 
-    // Keep HANDLE as isize rather than a raw pointer so this guard can be
-    // owned and released by different Controller threads behind a Mutex.
+    // Store the OS HANDLE in its pointer-sized integer representation so the
+    // guard may be owned by the Controller across receiver threads.
     pub(super) struct PowerRequest {
         handle: isize,
         display: bool,
@@ -71,10 +76,10 @@ mod platform {
                 reason: Reason { simple: reason.as_ptr() },
             };
             let handle = unsafe { PowerCreateRequest(&context) };
-            if handle.is_null() || handle as isize == -1 {
+            if handle == 0 || handle == -1 {
                 return Err(format!("PowerCreateRequest failed: {}", io::Error::last_os_error()));
             }
-            let mut request = Self { handle: handle as isize, display: false, system: false };
+            let mut request = Self { handle, display: false, system: false };
             if unsafe { PowerSetRequest(request.handle(), POWER_REQUEST_DISPLAY_REQUIRED) } == 0 {
                 return Err(format!("PowerSetRequest(DISPLAY) failed: {}", io::Error::last_os_error()));
             }
@@ -86,7 +91,7 @@ mod platform {
             Ok(request)
         }
 
-        fn handle(&self) -> Handle { self.handle as Handle }
+        fn handle(&self) -> Handle { self.handle }
     }
 
     impl Drop for PowerRequest {
