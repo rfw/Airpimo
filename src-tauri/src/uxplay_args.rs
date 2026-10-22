@@ -80,8 +80,8 @@ pub fn effective(name: &str, fps: u16, brightness: u8, user: &str) -> Result<Vec
     push_default(&mut args, &custom, "-vol", Some("0.5"));
     #[cfg(any(windows, target_os = "macos"))]
     push_default(&mut args, &custom, "-avdec", None);
-    #[cfg(target_os = "macos")]
-    push_default(&mut args, &custom, "-vsync", Some("no"));
+//     #[cfg(target_os = "macos")]
+//     push_default(&mut args, &custom, "-vsync", Some("no"));
 
     let mut i = 0;
     while i < custom.len() {
