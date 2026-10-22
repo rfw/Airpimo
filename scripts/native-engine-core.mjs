@@ -7,6 +7,7 @@ import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {applyRendererPatch} from '../native/patches/renderer-lifetime.mjs';
 import {applyAudioEmptyPacketPatch} from '../native/patches/audio-empty-packets.mjs';
+import {applyResponsiveWatermarkPatch} from '../native/patches/watermark-auto-size.mjs';
 
 export const PROJECT_ROOT=resolve(fileURLToPath(new URL('..',import.meta.url)));
 export const LOCK=JSON.parse(readFileSync(join(PROJECT_ROOT,'native/engine-lock.json'),'utf8'));
@@ -14,13 +15,15 @@ const SHA=/^[a-f0-9]{64}$/i;
 const COMMIT=/^[a-f0-9]{40}$/i;
 const ALLOWED_HOST='https://github.com/FDH2/UxPlay.git';
 // Changing the reviewed source transform invalidates every older engine receipt.
-// Historical manifest key `rendererPatchSha256` covers BOTH reviewed source
+// Historical manifest key `rendererPatchSha256` covers ALL reviewed source
 // transforms. Keeping this key retains the existing staging/release security
 // gates and invalidates all binaries built without the no-data audio fix.
 export const RENDERER_PATCH_SHA256=createHash('sha256')
   .update(readFileSync(join(PROJECT_ROOT,'native/patches/renderer-lifetime.mjs')))
   .update('\0')
   .update(readFileSync(join(PROJECT_ROOT,'native/patches/audio-empty-packets.mjs')))
+  .update('\0')
+  .update(readFileSync(join(PROJECT_ROOT,'native/patches/watermark-auto-size.mjs')))
   .digest('hex');
 export function targetId(platform=process.platform,arch=process.arch) {
   const id=`${platform}-${arch}`;
@@ -133,6 +136,7 @@ export function buildEngine({platform=process.platform,arch=process.arch,env=pro
   // Checkout above restores pristine pinned upstream on every build.
   // Fail closed when upstream source no longer matches the reviewed anchors.
   applyRendererPatch(join(src,'renderers','video_renderer.c'));
+  if(platform==='darwin') applyResponsiveWatermarkPatch(join(src,'renderers','video_renderer.c'));
   applyAudioEmptyPacketPatch(join(src,'lib','raop_buffer.c'), join(src,'lib','raop_rtp.c'));
   exec('git',['diff','--check','--','renderers/video_renderer.c','lib/raop_buffer.c','lib/raop_rtp.c'],src);
   const generator=platform==='win32'?['-G','Ninja']:[];

@@ -56,6 +56,8 @@ test('source patch is identified by content digest and older valid binary receip
     .update(readFileSync(new URL('../native/patches/renderer-lifetime.mjs',import.meta.url)))
     .update('\0')
     .update(readFileSync(new URL('../native/patches/audio-empty-packets.mjs',import.meta.url)))
+    .update('\0')
+    .update(readFileSync(new URL('../native/patches/watermark-auto-size.mjs',import.meta.url)))
     .digest('hex');
   assert.equal(RENDERER_PATCH_SHA256,actual);
   const dir=mkdtempSync(join(tmpdir(),'airpimo-renderer-patch-'));

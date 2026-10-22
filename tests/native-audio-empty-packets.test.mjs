@@ -174,6 +174,8 @@ test('cache digest includes renderer and the new no-data transform, invalidates 
     .update(readFileSync(new URL('../native/patches/renderer-lifetime.mjs', import.meta.url)))
     .update('\0')
     .update(readFileSync(new URL('../native/patches/audio-empty-packets.mjs', import.meta.url)))
+    .update('\0')
+    .update(readFileSync(new URL('../native/patches/watermark-auto-size.mjs', import.meta.url)))
     .digest('hex');
   assert.equal(RENDERER_PATCH_SHA256,actual);
   const dir=mkdtempSync(join(tmpdir(),'airpimo-empty-receipt-'));

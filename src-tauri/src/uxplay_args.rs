@@ -80,8 +80,6 @@ pub fn effective(name: &str, fps: u16, brightness: u8, user: &str) -> Result<Vec
     push_default(&mut args, &custom, "-vol", Some("0.5"));
     #[cfg(any(windows, target_os = "macos"))]
     push_default(&mut args, &custom, "-avdec", None);
-//     #[cfg(target_os = "macos")]
-//     push_default(&mut args, &custom, "-vsync", Some("no"));
 
     let mut i = 0;
     while i < custom.len() {
@@ -111,6 +109,10 @@ pub fn effective(name: &str, fps: u16, brightness: u8, user: &str) -> Result<Vec
         " xpad=16 ypad=16 font-desc=\"Sans 14\" color=0x99FFFFFF",
         " draw-shadow=true draw-outline=false shaded-background=false"
     ));
+    // The native macOS renderer listens for CAPS changes on this named
+    // overlay, then adjusts font and margins as the iPhone rotates.
+    #[cfg(target_os = "macos")]
+    converter.push_str(" name=airpimo_watermark auto-resize=false");
     args.push("-vc".into());
     args.push(converter);
     Ok(args)
