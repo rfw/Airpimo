@@ -5,7 +5,7 @@ import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {spawnSync} from 'node:child_process';
 import {gunzipSync,gzipSync} from 'node:zlib';
-import {LOCK} from '../scripts/native-engine-core.mjs';
+import {LOCK,RENDERER_PATCH_SHA256} from '../scripts/native-engine-core.mjs';
 import {sha256,buildBundle,unpackBundle,verifyNativeTree,importBundleBytes,verifiedBundleDir,encodeTar,decodeTar,reviewedBundleForTarget} from '../scripts/native-bundle-core.mjs';
 function withSandbox(fn) {const tmp=mkdtempSync(join(tmpdir(),'uxplay-runtime-v8-'));try{return fn(tmp)}finally{rmSync(tmp,{recursive:true,force:true})}}
 function createFixture(dir) {
@@ -15,7 +15,7 @@ function createFixture(dir) {
     'gstreamer/lib/gstreamer-1.0/libgstcoreelements.dll':Buffer.from('4d5a90004321','hex'),
     'gstreamer/bin/gst-inspect-1.0.exe':Buffer.from('4d5a90008899','hex'),
   };
-  const manifest={schema:1,ready:true,os:'win32',arch:'x64',upstream:{commit:LOCK.commit},gstreamerVersion:'1.24.12',files:[]};
+  const manifest={schema:1,ready:true,os:'win32',arch:'x64',upstream:{commit:LOCK.commit,rendererPatchSha256:RENDERER_PATCH_SHA256},gstreamerVersion:'1.24.12',files:[]};
   for(const [rel,bytes] of Object.entries(files)) {
     const dest=join(dir,...rel.split('/')); mkdirSync(join(dest,'..'),{recursive:true});writeFileSync(dest,bytes);
     manifest.files.push({path:rel,sha256:sha256(bytes)});
@@ -68,7 +68,7 @@ test('unsafe tar paths, symlink types and repeated names are rejected',()=>withS
   assert.throws(()=>decodeTar(bad),/Unsafe archive/);
 }));
 test('bundles.json requires pinned HTTPS and audited SHA-256',()=>{
- const id='win32-x64'; const good={url:'https://download.example.com/runtime.tar.gz',sha256:'a'.repeat(64),commit:LOCK.commit};
+ const id='win32-x64'; const good={url:'https://download.example.com/runtime.tar.gz',sha256:'a'.repeat(64),commit:LOCK.commit,rendererPatchSha256:RENDERER_PATCH_SHA256};
  assert.deepEqual(reviewedBundleForTarget(id,{targets:{[id]:good}}),good);
  assert.equal(reviewedBundleForTarget(id,{targets:{}}),null);
  assert.throws(()=>reviewedBundleForTarget(id,{targets:{[id]:{...good,url:'http://download.example.com/unsigned'}}}),/HTTPS/);
@@ -96,7 +96,7 @@ test('Windows native staging excludes SDK .a and unrelated executables',()=>with
   for(const [file,data] of Object.entries(files)){
     const path=join(gst,...file.split('/'));mkdirSync(join(path,'..'),{recursive:true});writeFileSync(path,data);
   }
-  const result=spawnSync(process.execPath,[join(scripts,'stage-native.mjs'),'--uxplay',bin,'--gst',gst,'--os','win32','--arch','x64','--upstream-commit',LOCK.commit,'--gst-version','1.24.12'],{encoding:'utf8'});
+  const result=spawnSync(process.execPath,[join(scripts,'stage-native.mjs'),'--uxplay',bin,'--gst',gst,'--os','win32','--arch','x64','--upstream-commit',LOCK.commit,'--gst-version','1.24.12','--renderer-patch-sha256',RENDERER_PATCH_SHA256],{encoding:'utf8'});
   assert.equal(result.status,0,result.stderr);
   const resources=join(project,'src-tauri','resources');
   assert.equal(existsSync(join(resources,'gstreamer','lib','libunused.a')),false);
@@ -105,7 +105,7 @@ test('Windows native staging excludes SDK .a and unrelated executables',()=>with
   assert.equal(verifyNativeTree(resources,options(tmp)).ready,true);
   // Win7 candidate staging MUST NOT overwrite current resources before ABI/smoke PASS.
   const candidate=join(tmp,'win7-candidate');
-  const result2=spawnSync(process.execPath,[join(scripts,'stage-native.mjs'),'--uxplay',bin,'--gst',gst,'--os','win32','--arch','x64','--upstream-commit',LOCK.commit,'--gst-version','1.24.13','--destination',candidate],{encoding:'utf8'});
+  const result2=spawnSync(process.execPath,[join(scripts,'stage-native.mjs'),'--uxplay',bin,'--gst',gst,'--os','win32','--arch','x64','--upstream-commit',LOCK.commit,'--gst-version','1.24.13','--renderer-patch-sha256',RENDERER_PATCH_SHA256,'--destination',candidate],{encoding:'utf8'});
   assert.equal(result2.status,0,result2.stderr);
   assert.equal(verifyNativeTree(candidate,options(tmp)).gstreamerVersion,'1.24.13');
   assert.equal(verifyNativeTree(resources,options(tmp)).gstreamerVersion,'1.24.12');

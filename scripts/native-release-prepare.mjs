@@ -7,7 +7,7 @@ import {existsSync, mkdirSync, renameSync, rmSync, cpSync, readdirSync, lstatSyn
 import {join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
-import {LOCK,PROJECT_ROOT,verifiedCachedEngine} from './native-engine-core.mjs';
+import {LOCK,PROJECT_ROOT,verifiedCachedEngine,RENDERER_PATCH_SHA256} from './native-engine-core.mjs';
 import {alignWin7Runtime,smokeWin7Plugins} from './win7-runtime-align.mjs';
 import {verifyNativeTree} from './native-bundle-core.mjs';
 import {readFileSync} from 'node:fs';
@@ -172,6 +172,7 @@ function main() {
   let preserveCandidate=false;
   try {
     const command=['scripts/stage-native.mjs','--uxplay',bin,'--gst',resolve(gst),'--os',process.platform,'--arch',process.arch,'--upstream-commit',mdnsLock?.commit??LOCK.commit,'--gst-version',gstVersion];
+    if(!mdnsLock)command.push('--renderer-patch-sha256',RENDERER_PATCH_SHA256);
     if(gstScanner)command.push('--gst-scanner',resolve(gstScanner));
     if(mdnsLock)command.push('--discovery-backend','internal-mdns','--mdns-receipt',resolve(mdnsReceiptFile));
     if(candidate)command.push('--destination',candidate);

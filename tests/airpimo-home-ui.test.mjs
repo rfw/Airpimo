@@ -20,23 +20,23 @@ test('Windows native titlebar remains; macOS HTML Header is conditional and over
   const home=read('src/components/AirpimoHome.tsx');
   const config=JSON.parse(read('src-tauri/tauri.conf.json'));
   const win=config.app.windows.find(w=>w.label==='main');
-  assert.match(home,/\{macOS && <header className="airpimo-header" data-tauri-drag-region>/);
+  assert.match(home,/\{macOS && \(\s*<header className="airpimo-header" data-tauri-drag-region>/);
   assert.match(home, /isMacOS\(\)/);
   assert.equal(win.titleBarStyle,'Overlay');
   assert.equal(win.hiddenTitle,true);
   const cap=JSON.parse(read('src-tauri/capabilities/default.json'));
   assert.ok(cap.permissions.includes('core:window:allow-start-dragging'));
-  assert.equal(win.width,480); assert.equal(win.height,420);
+  assert.equal(win.width,360); assert.equal(win.height,560);
   assert.equal(win.maximizable,false);
 });
 
 test('home UI contains only one real start/stop action and preserves the live receiver name',()=>{
   const home=read('src/components/AirpimoHome.tsx');
   const app=read('src/App.tsx');
-  assert.match(home,/const baseName = active \? \(snapshot\.applied_device_name \?\? snapshot\.settings\.device_name\) : snapshot\.settings\.device_name;/);
-  assert.match(home,/const name = `\$\{baseName\.replace\(\/@Airpimo\$\/, ''\)\}@Airpimo`/);
+  assert.match(home,/const baseName = active\s*\? snapshot\.applied_device_name \?\? snapshot\.settings\.device_name\s*: snapshot\.settings\.device_name;/);
+  assert.match(home,/const name = `\$\{baseName\.replace\(\/@Airpimo\$\/, ""\)\}@Airpimo`/);
   assert.match(home,/const onPrimaryAction = active \? onStop : retry \? onRetry : onStart;/);
-  assert.match(home,/const label = active \? '停止接收' : '开始接收';/);
+  assert.match(home,/const label = active \? "停止接收" : "开始接收";/);
   assert.match(home,/disabled=\{disabled\}/);
   assert.match(home,/aria-label="复制投屏设备名称"/);
   assert.match(home,/onCopy\(name\)/);
@@ -54,9 +54,9 @@ test('Footer contains a single accurate status, version, settings and help',()=>
   assert.doesNotMatch(home,/aria-label="查看诊断"/);
   assert.match(read('src/App.tsx'),/airpimo-tab-diagnostics/);
   assert.match(home,/v\{brand\.version\}/);
-  assert.match(home,/aria-live=\{statusTone === 'error'/);
-  assert.match(home,/const statusLabel = serviceError \? status\.label : feedback/);
-  assert.match(home,/canRestart \? <button/);
+  assert.match(home,/aria-live=\{statusTone === "error"/);
+  assert.match(home,/const statusLabel = serviceError\s*\? status\.label\s*: feedback/);
+  assert.match(home,/\{canRestart \? \(/);
   assert.match(home,/onClick=\{onClearFeedback\}/);
   assert.doesNotMatch(home, /airpimo-feedback|airpimo-restart|<div className="status-description"/);
   assert.match(status,/snapshot\.discovery_verified/);

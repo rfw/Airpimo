@@ -54,7 +54,7 @@ test('settings tabs, diagnostics, feedback timeout and tray default retain funct
   assert.match(app,/await desktop\.exportDiagnostics\(\)/);
   assert.match(app,/await desktop\.openReleasePage\(updateResult\.pageUrl\)/);
   assert.doesNotMatch(home,/onDiagnostics|CircleHelp|查看诊断/);
-  assert.match(home,/updateAvailable && <span className="airpimo-update-dot"/);
+  assert.match(home,/updateAvailable && \(\s*<span className="airpimo-update-dot"/);
   assert.match(file('src/domain/state.ts'),/stay_in_tray:true/);
   assert.match(file('src-tauri/src/settings.rs'),/stay_in_tray: true/);
   assert.match(app,/checked=\{draft\.stay_in_tray\}/);

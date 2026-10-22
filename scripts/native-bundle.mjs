@@ -3,7 +3,7 @@
 import {readFileSync, writeFileSync, mkdirSync, rmSync, openSync, closeSync, writeSync} from 'node:fs';
 import {join, resolve, dirname} from 'node:path';
 import {createHash} from 'node:crypto';
-import {LOCK, PROJECT_ROOT, targetId} from './native-engine-core.mjs';
+import {LOCK, PROJECT_ROOT, targetId, RENDERER_PATCH_SHA256} from './native-engine-core.mjs';
 import {buildBundle, importBundleBytes, verifiedBundleDir, stageBundleToProject, reviewedBundleForTarget, MAX_COMPRESSED, sha256} from './native-bundle-core.mjs';
 const args = process.argv.slice(2); const mode = args[0] ?? 'status';
 function opt(name) { const i = args.indexOf(name); return i < 0 ? null : args[i + 1]; }
@@ -43,7 +43,7 @@ try {
     mkdirSync(dirname(out),{recursive:true});writeFileSync(out,archive,{flag:'w'});
     const digest=sha256(archive);
     writeFileSync(join(dirname(out),'SHA256SUMS'),`${digest}  ${out.split(/[\\/]/).pop()}\n`);
-    writeFileSync(join(dirname(out),'bundle-registry-entry.template.json'),JSON.stringify({commit:LOCK.commit,url:'REPLACE_WITH_REVIEWED_HTTPS_URL',sha256:digest},null,2)+'\n');
+    writeFileSync(join(dirname(out),'bundle-registry-entry.template.json'),JSON.stringify({commit:LOCK.commit,rendererPatchSha256:RENDERER_PATCH_SHA256,url:'REPLACE_WITH_REVIEWED_HTTPS_URL',sha256:digest},null,2)+'\n');
     console.log(`PASS: ${out}\nSHA-256: ${digest}\nReview binary dependencies, Win7 ABI, GPL, and licenses before publishing.`);
   } else if (mode==='stage') {
     const where=stageBundleToProject();console.log(`PASS: staged cached native bundle for packaging: ${where}`);

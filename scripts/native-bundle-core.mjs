@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync, renameSync, statSync, chmodSync, readdirSync, cpSync, lstatSync } from 'node:fs';
 import { join, resolve, dirname, sep } from 'node:path';
-import { cacheRoot, targetId, engineName, LOCK, PROJECT_ROOT } from './native-engine-core.mjs';
+import { cacheRoot, targetId, engineName, LOCK, PROJECT_ROOT, RENDERER_PATCH_SHA256 } from './native-engine-core.mjs';
 import {verifyMdnsManifest} from './win7-mdns-core.mjs';
 
 const SHA = /^[a-f0-9]{64}$/;
@@ -23,7 +23,10 @@ export function validateManifest(manifest, { platform = process.platform, arch =
   must(manifest?.schema === 1 && manifest.ready === true, 'Runtime manifest is not release-ready');
   must(manifest.os === platform && manifest.arch === arch, `Runtime target ${manifest.os}/${manifest.arch} is not ${platform}/${arch}`);
   if(manifest.discovery?.backend==='internal-mdns')verifyMdnsManifest(manifest);
-  else must(manifest.upstream?.commit === LOCK.commit, 'UxPlay upstream commit differs from pin');
+  else {
+    must(manifest.upstream?.commit === LOCK.commit, 'UxPlay upstream commit differs from pin');
+    must(manifest.upstream?.rendererPatchSha256 === RENDERER_PATCH_SHA256, 'UxPlay renderer patch identity missing or stale');
+  }
   must(/^\d+\.\d+\.\d+$/.test(manifest.gstreamerVersion ?? ''), 'GStreamer exact version missing');
   must(Array.isArray(manifest.files) && manifest.files.length >= 3 && manifest.files.length <= MAX_FILES, 'Runtime file manifest invalid');
   const seen = new Set(); let engine = false, plugin = false, library = false;
@@ -189,7 +192,7 @@ export function stageBundleToProject(options = {}) {
 export function reviewedBundleForTarget(id, registry) {
   const entry = registry?.targets?.[id];
   if (!entry) return null;
-  must(entry.commit === LOCK.commit && SHA.test(entry.sha256 ?? ''), 'Bundle registry missing pinned commit/SHA256');
+  must(entry.commit === LOCK.commit && entry.rendererPatchSha256 === RENDERER_PATCH_SHA256 && SHA.test(entry.sha256 ?? ''), 'Bundle registry missing pinned commit/renderer patch/SHA256');
   const u = new URL(entry.url);
   must(u.protocol === 'https:' && !u.username && !u.password && !!u.hostname && !u.hash, 'Bundle URL must be credential-free HTTPS');
   return entry;

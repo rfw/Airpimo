@@ -4,7 +4,7 @@ import {existsSync, mkdirSync, rmSync, readFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {fileURLToPath} from 'node:url';
-import {verifiedCachedEngine,engineDir,targetId,LOCK,PROJECT_ROOT,storeEngine,prebuiltForTarget,downloadVerified,buildEngine} from './native-engine-core.mjs';
+import {verifiedCachedEngine,engineDir,targetId,LOCK,PROJECT_ROOT,storeEngine,prebuiltForTarget,downloadVerified,buildEngine,RENDERER_PATCH_SHA256} from './native-engine-core.mjs';
 const args=process.argv.slice(2);
 const command=args[0]??'prepare';
 const silent=args.includes('--quiet');
@@ -27,6 +27,8 @@ try {
         try {
           log(`[native] Fetching pinned SHA-256-verified executable for ${id}`);
           await downloadVerified(asset.url,asset.sha256,temp);
+          // Prebuilt registry must declare this exact reviewed renderer patch identity.
+          if(asset.rendererPatchSha256!==RENDERER_PATCH_SHA256)throw Error('Prebuilt renderer patch identity mismatch');
           storeEngine(temp,{origin:'verified-prebuilt'});
         } finally {rmSync(temp,{force:true});}
       } else if(!args.includes('--no-build')) {

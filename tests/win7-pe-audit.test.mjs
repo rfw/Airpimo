@@ -4,6 +4,7 @@ import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,existsSync,copyF
 import {join,dirname} from 'node:path';
 import {tmpdir} from 'node:os';
 import {createHash} from 'node:crypto';
+import {RENDERER_PATCH_SHA256} from '../scripts/native-engine-core.mjs';
 import {parsePE,auditWin7Runtime} from '../scripts/win7-pe-audit.mjs';
 import {alignWin7Runtime,smokeWin7Plugins} from '../scripts/win7-runtime-align.mjs';
 import {promoteNativeCandidate} from '../scripts/native-release-prepare.mjs';
@@ -198,7 +199,7 @@ function writePromotableRuntime(root, tag) {
   fixture(root,files);
   const manifest={
     schema:1,ready:true,os:process.platform,arch:process.arch,
-    upstream:{commit:'df67c212a433cf6dda3676dd40c097900d24e645'},
+    upstream:{commit:'df67c212a433cf6dda3676dd40c097900d24e645',rendererPatchSha256:RENDERER_PATCH_SHA256},
     gstreamerVersion:'1.24.13',
     files:Object.entries(files).map(([path,contents])=>({
       path,sha256:createHash('sha256').update(contents).digest('hex'),

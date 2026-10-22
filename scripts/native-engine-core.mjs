@@ -5,12 +5,15 @@ import {homedir} from 'node:os';
 import {join, resolve, isAbsolute} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import {applyRendererPatch} from '../native/patches/renderer-lifetime.mjs';
 
 export const PROJECT_ROOT=resolve(fileURLToPath(new URL('..',import.meta.url)));
 export const LOCK=JSON.parse(readFileSync(join(PROJECT_ROOT,'native/engine-lock.json'),'utf8'));
 const SHA=/^[a-f0-9]{64}$/i;
 const COMMIT=/^[a-f0-9]{40}$/i;
 const ALLOWED_HOST='https://github.com/FDH2/UxPlay.git';
+// Changing the reviewed source transform invalidates every older engine receipt.
+export const RENDERER_PATCH_SHA256=createHash('sha256').update(readFileSync(join(PROJECT_ROOT,'native/patches/renderer-lifetime.mjs'))).digest('hex');
 export function targetId(platform=process.platform,arch=process.arch) {
   const id=`${platform}-${arch}`;
   if(!LOCK.platforms.includes(id)) throw Error(`Unsupported engine target ${id}; Win7 is Windows x64 only`);
@@ -38,7 +41,7 @@ export function verifiedCachedEngine(options={}) {
   const receiptPath=join(folder,'receipt.json');
   try {
     const receipt=JSON.parse(readFileSync(receiptPath,'utf8'));
-    if(receipt.commit!==LOCK.commit||receipt.target!==targetId(platform,options.arch??process.arch)||!SHA.test(receipt.sha256))return null;
+    if(receipt.commit!==LOCK.commit||receipt.rendererPatchSha256!==RENDERER_PATCH_SHA256||receipt.target!==targetId(platform,options.arch??process.arch)||!SHA.test(receipt.sha256))return null;
     if(!isBinaryForPlatform(path,platform)||digest(path)!==receipt.sha256)return null;
     if(platform!=='win32'&&!(statSync(path).mode&0o111))return null;
     return realpathSync(path);
@@ -56,7 +59,7 @@ export function storeEngine(source,{platform=process.platform,arch=process.arch,
     if(platform!=='win32')chmodSync(temp,0o755);
     const hash=digest(temp);
     renameSync(temp,target);
-    const receipt={schema:1,commit:LOCK.commit,target:id,sha256:hash,origin};
+    const receipt={schema:2,commit:LOCK.commit,rendererPatchSha256:RENDERER_PATCH_SHA256,target:id,sha256:hash,origin};
     writeFileSync(join(dir,'receipt.json'),JSON.stringify(receipt,null,2)+'\n');
     return {binary:target,sha256:hash,receipt};
   } finally {rmSync(temp,{force:true});}
@@ -64,7 +67,7 @@ export function storeEngine(source,{platform=process.platform,arch=process.arch,
 export function prebuiltForTarget(id, registry) {
   const item=registry.targets?.[id];
   if(!item)return null;
-  if(item.commit!==LOCK.commit||!SHA.test(item.sha256)||typeof item.url!=='string') throw Error(`Invalid prebuilt registry for ${id}: exact pinned commit, SHA-256 and HTTPS URL required`);
+  if(item.commit!==LOCK.commit||item.rendererPatchSha256!==RENDERER_PATCH_SHA256||!SHA.test(item.sha256)||typeof item.url!=='string') throw Error(`Invalid prebuilt registry for ${id}: exact pinned commit, SHA-256 and HTTPS URL required`);
   const url=new URL(item.url);
   if(url.protocol!=='https:'||url.username||url.password||!url.hostname)throw Error('Prebuilt must use authenticated-reviewed HTTPS artifact URL without URL credentials');
   return item;
@@ -119,6 +122,10 @@ export function buildEngine({platform=process.platform,arch=process.arch,env=pro
   if(checked.status!==0||checked.stdout.trim().toLowerCase()!==LOCK.commit)throw Error('Upstream checkout does not match pinned SHA');
   const dirty=run('git',['status','--porcelain'],{cwd:src,env,encoding:'utf8'});
   if(dirty.status!==0||dirty.stdout.trim())throw Error('Pinned source tree has local changes; refusing to build');
+  // Checkout above restores pristine pinned upstream on every build.
+  // Fail closed when upstream source no longer matches the reviewed anchors.
+  applyRendererPatch(join(src,'renderers','video_renderer.c'));
+  exec('git',['diff','--check','--','renderers/video_renderer.c'],src);
   const generator=platform==='win32'?['-G','Ninja']:[];
   exec('cmake',['-S',src,'-B',build,...generator,...LOCK.buildFlags]);
   exec('cmake',['--build',build,'--config','Release','--parallel','2']);

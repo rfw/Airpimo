@@ -13,6 +13,7 @@ function die(text){console.error(`BLOCKED: ${text}`);process.exit(2)}
 const DEST=value('--destination')?resolve(value('--destination')):defaultDestination;
 const uxplay=value('--uxplay'), gst=value('--gst'), os=value('--os'), arch=value('--arch'), commit=value('--upstream-commit'), gstVersion=value('--gst-version');
 const gstScanner=value('--gst-scanner');
+const patchSha=value('--renderer-patch-sha256');
 const internalMdns=value('--discovery-backend')==='internal-mdns';
 const mdnsReceiptFile=value('--mdns-receipt');
 if (!uxplay || !gst || !os || !arch || !commit || !gstVersion) die('必要参数: --uxplay <file> --gst <dir> --os darwin|win32 --arch x64|arm64 --upstream-commit <40hex> --gst-version <version>');
@@ -27,6 +28,18 @@ if(internalMdns) {
   verifyMdnsReceipt(receipt,{lock:readMdnsLock(),binary:resolve(uxplay)});
   if(commit.toLowerCase()!==readMdnsLock().commit)die('Internal mDNS variant must use the explicitly pinned 1.74 experimental commit');
 } else if (commit.toLowerCase()!==UPSTREAM) die(`上游 UxPlay 源码必须按已选基线固定: ${UPSTREAM}`);
+if(!internalMdns) {
+  if(!/^[a-f0-9]{64}$/i.test(patchSha??''))die('Pinned UxPlay 1.73.7 staging requires --renderer-patch-sha256 from the reviewed native:prepare build');
+  // In the actual repository (unlike isolated staging fixtures), revalidate
+  // the pinned, patched engine receipt rather than trusting a caller-supplied hash.
+  if(existsSync(join(REPO,'scripts','native-engine-core.mjs'))) {
+    const {verifiedCachedEngine,RENDERER_PATCH_SHA256}=await import('./native-engine-core.mjs');
+    if(patchSha.toLowerCase()!==RENDERER_PATCH_SHA256)die('Renderer patch source digest differs from the requested runtime');
+    const cached=verifiedCachedEngine({platform:os,arch});
+    if(!cached || realpathSync(cached)!==realpathSync(resolve(uxplay)))die('Release staging requires the SHA-verified, patched native:prepare executable');
+  }
+}
+
 const sourceBinary=resolve(uxplay), sourceGst=resolve(gst);
 if (!existsSync(sourceBinary) || !statSync(sourceBinary).isFile()) die('找不到 UxPlay 可执行文件');
 if (!existsSync(sourceGst) || !statSync(sourceGst).isDirectory()) die('找不到 GStreamer runtime 目录');
@@ -175,6 +188,6 @@ function walk(p,relative='') {
   }
 }
 walk(outSidecar,'sidecar');walk(outGst,'gstreamer');
-const manifest={schema:1,ready:true,os,arch,upstream:{repository:'https://github.com/FDH2/UxPlay',tag:internalMdns?'1.74-experimental-pinned':'v1.73.7',commit:internalMdns?commit.toLowerCase():UPSTREAM},...(internalMdns?{discovery:{backend:'internal-mdns',engineSha256:createHash('sha256').update(readFileSync(sourceBinary)).digest('hex')}}:{}),gstreamerVersion:gstVersion,files:files.sort((a,b)=>a.path.localeCompare(b.path))};
+const manifest={schema:1,ready:true,os,arch,upstream:{repository:'https://github.com/FDH2/UxPlay',tag:internalMdns?'1.74-experimental-pinned':'v1.73.7',commit:internalMdns?commit.toLowerCase():UPSTREAM,...(!internalMdns?{rendererPatchSha256:patchSha.toLowerCase()}:{})},...(internalMdns?{discovery:{backend:'internal-mdns',engineSha256:createHash('sha256').update(readFileSync(sourceBinary)).digest('hex')}}:{}),gstreamerVersion:gstVersion,files:files.sort((a,b)=>a.path.localeCompare(b.path))};
 writeFileSync(join(DEST,'native-manifest.json'),JSON.stringify(manifest,null,2)+'\n');
 console.log(`已准备 ${files.length} 个本地运行时文件。注意：静态文件检查不代表 Win7/macOS 干净机测试通过。`);

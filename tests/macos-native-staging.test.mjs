@@ -1,3 +1,4 @@
+import {RENDERER_PATCH_SHA256} from '../scripts/native-engine-core.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -42,7 +43,7 @@ function withMacFixture(fn) {
     return spawnSync(process.execPath,[
       ...nodeArgs,join(scripts,'stage-native.mjs'),'--uxplay',engine,'--gst',gst,
       '--os','darwin','--arch',arch,'--upstream-commit',LOCK.commit,
-      '--gst-version','1.28.8',...extraArgs
+      '--gst-version','1.28.8','--renderer-patch-sha256',RENDERER_PATCH_SHA256,...extraArgs
     ],{encoding:'utf8',env});
   };
   try {return fn({folder,project,gst,put,link,run});}

@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
-import {targetId,LOCK,engineDir,verifiedCachedEngine,storeEngine,prebuiltForTarget,downloadVerified,validateSourceLock,buildEngine} from '../scripts/native-engine-core.mjs';
+import {targetId,LOCK,engineDir,verifiedCachedEngine,storeEngine,prebuiltForTarget,downloadVerified,validateSourceLock,buildEngine,RENDERER_PATCH_SHA256} from '../scripts/native-engine-core.mjs';
 
 async function sandbox(callback) {
  const dir=mkdtempSync(join(tmpdir(),'uxplay-native-int-'));
@@ -35,6 +35,7 @@ test('storing a macOS executable records SHA and reuses it across launches', {sk
  assert.equal(verifiedCachedEngine(opts),result.binary);
  const receipt=JSON.parse(readFileSync(join(engineDir(opts),'receipt.json'),'utf8'));
  assert.equal(receipt.commit,LOCK.commit);
+ assert.equal(receipt.rendererPatchSha256,RENDERER_PATCH_SHA256);
  assert.equal(receipt.target,'darwin-x64');
 }));
 test('corrupt binary and false cached receipt fail closed',()=>sandbox(dir=>{
@@ -50,9 +51,10 @@ test('foreign executable rejected even with expected name',()=>sandbox(dir=>{
  assert.throws(()=>storeEngine(file,{platform:'win32',arch:'x64',home:dir,env:{}}),/not a recognized/);
 }));
 test('prebuilt requires HTTPS, exact SHA256 and matching upstream commit',()=>{
- const id='darwin-x64';const entry={url:'https://build.example.org/uxplay',sha256:hash(MACH),commit:LOCK.commit};
+ const id='darwin-x64';const entry={url:'https://build.example.org/uxplay',sha256:hash(MACH),commit:LOCK.commit,rendererPatchSha256:RENDERER_PATCH_SHA256};
  assert.deepEqual(prebuiltForTarget(id,{targets:{[id]:entry}}),entry);
  assert.equal(prebuiltForTarget(id,{targets:{}}),null);
+ assert.throws(()=>prebuiltForTarget(id,{targets:{[id]:{...entry,rendererPatchSha256:undefined}}}),/Invalid/);
  assert.throws(()=>prebuiltForTarget(id,{targets:{[id]:{...entry,commit:'fake'}}}),/Invalid/);
  assert.throws(()=>prebuiltForTarget(id,{targets:{[id]:{...entry,url:'http://build.example.org/uxplay'}}}),/HTTPS/);
 });

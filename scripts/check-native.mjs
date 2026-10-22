@@ -4,6 +4,7 @@ import {resolve,join} from 'node:path';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {auditMacNative} from './audit-macos-native.mjs';
+import {LOCK,RENDERER_PATCH_SHA256} from './native-engine-core.mjs';
 import {auditWin7Runtime} from './win7-pe-audit.mjs';
 import {auditPackagedCxxAbi} from './win7-cxx-abi.mjs';
 import {verifyFixedWebview2} from './win7-release-core.mjs';
@@ -19,7 +20,10 @@ if(!manifest.ready) fail('UxPlay/GStreamer 尚未经过本地准备');
 if(manifest.os!==process.platform || manifest.arch!==process.arch) fail(`本机 ${process.platform}/${process.arch} 与依赖 ${manifest.os}/${manifest.arch} 不一致`);
 if(manifest.discovery?.backend==='internal-mdns') {
   try{verifyMdnsManifest(manifest,{lock:readMdnsLock()});}catch(e){fail(e.message);}
-} else if(manifest.upstream?.commit!=='df67c212a433cf6dda3676dd40c097900d24e645') fail('UxPlay commit 不匹配');
+} else {
+  if(manifest.upstream?.commit!==LOCK.commit)fail('UxPlay commit 不匹配');
+  if(manifest.upstream?.rendererPatchSha256!==RENDERER_PATCH_SHA256)fail('UxPlay renderer patch 缺失或已过期；请重新 native:prepare 并准备完整原生运行时');
+}
 if(process.argv.includes('--require-mdns') && manifest.discovery?.backend!=='internal-mdns')fail('Bonjour-free package requires pinned UxPlay 1.74 internal-mDNS provenance. Current staged engine is legacy Bonjour 1.73.7.');
 if(!Array.isArray(manifest.files) || manifest.files.length<3) fail('原生依赖不完整');
 const seen = new Set();
