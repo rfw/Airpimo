@@ -32,6 +32,7 @@
     }
   },
   "bundle": {
+    "publisher": "rfw",
     "targets": ["nsis"],
     "active": true,
     "icon": [
@@ -50,7 +51,8 @@
     "windows": {
       "nsis": {
         "displayLanguageSelector": false,
-        "startMenuFolder": "Airpimo"
+        "startMenuFolder": "Airpimo",
+        "installerIcon": "icons/installer.ico"
       },
       "webviewInstallMode": {
         "type": "downloadBootstrapper"
