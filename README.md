@@ -1,21 +1,23 @@
+**English** | [简体中文](README.zh-CN.md)
+
 # Airpimo
 
-> 官方仓库：<https://github.com/rfw/Airpimo>。当前社区版自有代码采用 **GPL-3.0-or-later（GPLv3）**，完整条款见 [LICENSE](LICENSE)。UxPlay 等第三方组件保持其原始许可，详见 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)。
+> Official repository: <https://github.com/rfw/Airpimo>. Airpimo's original code in the current community edition is licensed under **GPL-3.0-or-later (GPLv3)**. See [LICENSE](LICENSE) for the full terms. Third-party components, including UxPlay, retain their respective licenses. See [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt) for details.
 
-Airpimo 是跨平台桌面 AirPlay 接收应用，使用 **Tauri + React + Rust** 提供控制界面，并通过独立的 **UxPlay/GStreamer** 原生进程接收和播放音视频。
+Airpimo is a cross-platform desktop AirPlay receiver. It uses **Tauri + React + Rust** for its control interface and a separate native **UxPlay/GStreamer** process to receive and play video and audio.
 
-## 功能
+## Features
 
-- iPhone/iPad 屏幕镜像接收，设备名称可配置
-- 启动/停止接收、运行状态和错误提示
-- 系统托盘、主题、设置及诊断日志
-- Windows 7 与 Windows 10/11 的独立构建配置、macOS Intel/Apple Silicon 构建配置
+- Receive iPhone/iPad screen mirroring with a configurable device name
+- Start and stop the receiver, view its status, and see error messages
+- System tray integration, themes, settings, and diagnostic logs
+- Separate build configurations for Windows 7 and Windows 10/11, plus macOS builds for Intel and Apple Silicon
 
-实际支持范围以相应目标系统和原生音视频运行库的实机测试为准。
+Actual platform support depends on testing with the target operating system and its native audio/video runtime.
 
-## 本地开发
+## Local Development
 
-需安装 Node.js/npm、Rust 工具链，以及对应平台的 Tauri 编译依赖。
+Install Node.js/npm, the Rust toolchain, and the Tauri build prerequisites for your platform.
 
 ```sh
 npm ci
@@ -25,20 +27,20 @@ npm run build
 npm run tauri dev
 ```
 
-`npm run desktop:dev` 使用项目已有的原生资源或经过校验的开发 Runtime；`npm run tauri dev` 是另一种本地启动入口。若缺少 UxPlay/GStreamer，网页界面能够启动不代表投屏可用。
+`npm run desktop:dev` uses the project's existing native resources or a verified development runtime. `npm run tauri dev` is another entry point for local development. A working web interface does not necessarily mean AirPlay mirroring will work if UxPlay or GStreamer is unavailable.
 
-详细的开发依赖、Windows/macOS 打包命令见 [开发说明](docs/DEVELOPMENT.md)；发行前的完整性校验与授权义务见 [发布说明](docs/RELEASE.md)。
+See the [development guide](docs/DEVELOPMENT.md) for detailed prerequisites and Windows/macOS packaging commands. See the [release guide](docs/RELEASE.md) for pre-release integrity checks and licensing obligations.
 
-## 项目结构
+## Project Structure
 
-| 路径 | 内容 |
+| Path | Description |
 | --- | --- |
-| `src/` | React UI、主题、设置及状态展示 |
-| `src-tauri/src/` | Rust 后端、接收进程管理、托盘与诊断 |
-| `scripts/` | 原生资源准备、ABI 检查、构建与测试 |
-| `src-tauri/resources/` | 分发时暂存的 UxPlay、GStreamer 等平台资源 |
-| `.github/workflows/` | GitHub Actions 构建与发布门禁 |
+| `src/` | React UI, themes, settings, and status display |
+| `src-tauri/src/` | Rust backend, receiver process management, system tray, and diagnostics |
+| `scripts/` | Native resource preparation, ABI checks, builds, and tests |
+| `src-tauri/resources/` | Staging area for platform-specific resources such as UxPlay and GStreamer |
+| `.github/workflows/` | GitHub Actions build and release checks |
 
-## 版权与贡献
+## Copyright and Contributions
 
-Airpimo 不拥有 UxPlay/GStreamer 的上游版权。修改、使用或分发相应组件时，必须分别遵守其许可证并提供必要的版权声明及对应源码。社区版采用 GPLv3，并不表示第三方代码获得了另行商业重授权。
+Airpimo does not own the upstream copyrights for UxPlay or GStreamer. Any modification, use, or distribution of these components must comply with their respective licenses and include the required copyright notices and corresponding source code. The community edition's GPLv3 license does not grant separate commercial relicensing rights to third-party code.
