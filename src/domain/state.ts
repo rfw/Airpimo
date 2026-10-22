@@ -24,9 +24,9 @@ export const stageTitle: Record<Stage, string> = {
   stopped:'接收已停止', starting:'正在启动', waiting:'等待连接', connecting:'正在连接', connected:'已连接', error:'接收出现问题'
 };
 export function secondaryText(s: Snapshot): string {
-  if (s.stage === 'waiting' && !s.discovery_verified) return '接收进程运行中 · 网络发现尚未验证';
-  if (s.stage === 'connected' && !s.audio_verified) return '镜像连接已建立 · 请确认声音正常';
-  if (s.stage === 'waiting' && s.discovery_verified) return 'AirPlay 广播已核验';
+  if (s.stage === 'waiting' && !s.discovery_verified) return '请在手机上查找 Airpimo';
+  if (s.stage === 'connected' && !s.audio_verified) return '已连接，声音待确认';
+  if (s.stage === 'waiting' && s.discovery_verified) return '可从手机发起投屏';
   return s.detail;
 }
 export function issueHint(issue: Issue, development = false): string {

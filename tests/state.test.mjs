@@ -5,13 +5,39 @@ import {defaultSnapshot, stageTitle, secondaryText, issueHint, validateDeviceNam
 test('all required six states are described',()=>{
   assert.deepEqual(Object.keys(stageTitle).sort(),['connected','connecting','error','starting','stopped','waiting'].sort());
 });
-test('no false AirPlay discovery success from process presence',()=>{
-  const ready={...defaultSnapshot,stage:'waiting',process_running:true,discovery_verified:false};
-  assert.match(secondaryText(ready),/尚未验证/);
-  assert.doesNotMatch(secondaryText(ready),/已开启|已核验/);
+test('waiting status gives an actionable tip without claiming AirPlay discovery is verified', () => {
+  const waiting = {
+    ...defaultSnapshot,
+    stage: 'waiting',
+    process_running: true,
+    discovery_verified: false,
+  };
+  assert.equal(secondaryText(waiting), '请在手机上查找 Airpimo');
+  assert.doesNotMatch(secondaryText(waiting), /已验证|已核验|已发现/);
+
+  assert.equal(
+    secondaryText({...waiting, discovery_verified: true}),
+    '可从手机发起投屏',
+  );
 });
-test('connected is not audio verified',()=>{
-  assert.match(secondaryText({...defaultSnapshot,stage:'connected',audio_verified:false}),/请确认声音/);
+test('connected status prompts audio confirmation only when not verified', () => {
+  const connected = {
+    ...defaultSnapshot,
+    stage: 'connected',
+    detail: '投屏画面已连接',
+    audio_verified: false,
+  };
+  assert.equal(secondaryText(connected), '已连接，声音待确认');
+  assert.equal(
+    secondaryText({...connected, audio_verified: true}),
+    '投屏画面已连接',
+  );
+});
+test('other stages keep the original backend detail', () => {
+  for (const stage of ['stopped', 'starting', 'connecting', 'error']) {
+    const snapshot = {...defaultSnapshot, stage, detail: `诊断详情：${stage}`};
+    assert.equal(secondaryText(snapshot), snapshot.detail, stage);
+  }
 });
 test('diagnostic issue messages are actionable',()=>{
   for(const key of ['missing_binary','missing_runtime','port_in_use','mdns','audio','video','crash','unknown']) assert.ok(issueHint(key).length>=10,key);
