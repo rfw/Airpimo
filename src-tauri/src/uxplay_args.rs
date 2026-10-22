@@ -94,10 +94,25 @@ pub fn effective(name: &str, fps: u16, brightness: u8, user: &str) -> Result<Vec
         i += 1;
     }
     args.extend(["-nh".into(), "-n".into(), advertised_name(name), "-fps".into(), fps.to_string()]);
+    // -vc replaces the video conversion stage of UxPlay's native GStreamer
+    // pipeline. The watermark is composited into decoded VIDEO frames only:
+    // no Tauri overlay, no additional native window, no encoded-stream changes.
+    // Keep videobalance ahead of the watermark so a dimmed video does not dim
+    // the Airpimo label. Always provide -vc, including brightness=100%.
+    let mut converter = String::from("videoconvert");
     if brightness < 100 {
-        args.push("-vc".into());
-        args.push(format!("videoconvert ! videobalance brightness={}", crate::settings::videobalance_brightness(brightness)));
+        converter.push_str(&format!(
+            " ! videobalance brightness={}",
+            crate::settings::videobalance_brightness(brightness)
+        ));
     }
+    converter.push_str(concat!(
+        " ! textoverlay text=Airpimo halignment=right valignment=bottom",
+        " xpad=16 ypad=16 font-desc=\"Sans 14\" color=0x99FFFFFF",
+        " draw-shadow=true draw-outline=false shaded-background=false"
+    ));
+    args.push("-vc".into());
+    args.push(converter);
     Ok(args)
 }
 
@@ -133,9 +148,24 @@ mod tests {
         assert_eq!(strings.windows(2).find(|s| s[0] == "-fps").unwrap()[1], "60");
     }
     #[test]
-    fn ui_brightness_100_drops_custom_converter() {
+    fn watermark_is_present_at_full_brightness_and_custom_converter_cannot_replace_it() {
         let args = effective("Room", 100, 100, "-vc=bad -vol=0.7").unwrap();
-        assert!(!args.iter().any(|x| flag_key(x) == "-vc"));
+        let converters = args.windows(2).filter(|pair| pair[0] == "-vc").collect::<Vec<_>>();
+        assert_eq!(converters.len(), 1);
+        assert!(!converters[0][1].contains("videobalance"));
+        assert!(converters[0][1].contains("textoverlay text=Airpimo"));
+        assert!(converters[0][1].contains("font-desc=\"Sans 14\""));
+        assert!(!args.iter().any(|x| x.contains("bad")));
         assert!(args.contains(&"-vol=0.7".to_string()));
+    }
+    #[test]
+    fn brightness_control_and_bottom_right_watermark_are_composed_in_order() {
+        let args = effective("Room", 60, 75, "").unwrap();
+        let pipeline = args.windows(2).find(|pair| pair[0] == "-vc").unwrap()[1].as_str();
+        assert!(pipeline.starts_with("videoconvert ! videobalance brightness=-0.25 ! textoverlay"));
+        for key in ["halignment=right", "valignment=bottom", "xpad=16", "ypad=16", "color=0x99FFFFFF"] {
+            assert!(pipeline.contains(key), "missing {key}");
+        }
+        assert_eq!(args.iter().filter(|item| item.as_str() == "-vc").count(), 1);
     }
 }

@@ -17,7 +17,7 @@ import {isMachO,parseLibraries} from './audit-macos-native.mjs';
 // hardware playback alternatives, not arbitrary Homebrew plugins.
 export const REQUIRED_ELEMENTS=Object.freeze([
   'appsrc','queue','h264parse','avdec_h264','avdec_aac','videoconvert',
-  'videobalance','audioconvert','audioresample','volume','level','decodebin',
+  'videobalance','textoverlay','audioconvert','audioresample','volume','level','decodebin',
   'autovideosink','autoaudiosink','osxaudiosink',
 ]);
 export const OPTIONAL_ELEMENTS=Object.freeze([

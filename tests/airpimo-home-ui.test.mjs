@@ -63,7 +63,6 @@ test('Footer contains a single accurate status, version, settings and help',()=>
   assert.match(status,/发现未验证/);
   assert.match(status,/接收异常：/);
   assert.match(status,/桌面服务错误：/);
-  assert.match(read('src/styles/airpimo-home.css'),/max-height: 390px/);
 });
 
 test('UI patch is idempotent, preserves product version and backend code',()=>fixture(tmp=>{

@@ -89,6 +89,5 @@ test('Win7 NSIS installs machine-wide with start menu and uninstall registration
 test('home device typography reduced without changing base-name@Airpimo semantics',()=>{
  const css=read('src/styles/airpimo-home.css');
  assert.match(css,/\.airpimo-device-name \{\s*font-size: 20px;/);
- assert.match(css,/@media \(max-width: 450px\)[\s\S]*?\.airpimo-device-name \{\s*font-size: 16px;/);
  assert.match(read('src/components/AirpimoHome.tsx'),/baseName\.replace\(\/@Airpimo\$\//);
 });

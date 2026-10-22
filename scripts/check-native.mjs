@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import {existsSync, readFileSync, statSync} from 'node:fs';
+import {existsSync, readFileSync, statSync, realpathSync} from 'node:fs';
 import {resolve,join} from 'node:path';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
@@ -64,6 +64,31 @@ if(manifest.os==='win32') {
   const cxx=auditPackagedCxxAbi(root,manifest);
   if(!cxx.ok) fail(`GStreamer C++ DLL export mismatch (${cxx.modulesChecked} packaged native modules):\n`+cxx.problems.slice(0,24).join('\n'));
   console.log(`PASS: GStreamer C++ DLL ABI checked across ${cxx.modulesChecked} packaged executables and DLLs`);
+  // All Windows releases use the same video -vc pipeline, including Win7.
+  // Verify the packaged Pango textoverlay plugin instead of only checking
+  // that the installation SDK provides it.
+  const gst=join(root,'gstreamer'), bin=join(gst,'bin');
+  const pluginDir=join(gst,'lib','gstreamer-1.0');
+  const inspector=join(bin,'gst-inspect-1.0.exe');
+  const scanner=join(gst,'libexec','gstreamer-1.0','gst-plugin-scanner.exe');
+  if(!existsSync(inspector)||!existsSync(scanner)) fail('Windows GStreamer packaged inspector/scanner missing');
+  const env={...process.env,PATH:[bin,process.env.PATH??''].join(';'),
+    GST_PLUGIN_PATH_1_0:pluginDir,GST_PLUGIN_SYSTEM_PATH_1_0:'',
+    GST_PLUGIN_PATH:pluginDir,GST_PLUGIN_SYSTEM_PATH:'',
+    GST_PLUGIN_SCANNER_1_0:scanner,
+    GST_REGISTRY_1_0:join(process.env.TEMP??process.env.TMP??bin,`airpimo-watermark-${process.pid}.bin`)};
+  const inspect=spawnSync(inspector,['textoverlay'],{encoding:'utf8',env,timeout:30000,windowsHide:true});
+  if(inspect.error||inspect.status!==0) fail(`Packaged Windows textoverlay plugin load failed: ${inspect.error?.message??(inspect.stderr||inspect.stdout||inspect.status).toString().slice(-600)}`);
+  const required='gstreamer/lib/gstreamer-1.0/libgstpango.dll';
+  if(!manifest.files.some(file=>file.path.toLowerCase()===required))
+    fail('Packaged Windows textoverlay requires the libgstpango.dll plugin in the verified manifest');
+  const pluginMatch=(inspect.stdout??'').match(/^\s*Filename\s+(.+?)\s*$/m);
+  const reportedPlugin=pluginMatch?.[1];
+  const expectedPlugin=join(root,'gstreamer','lib','gstreamer-1.0','libgstpango.dll');
+  if(!reportedPlugin||!existsSync(reportedPlugin)||
+    realpathSync(reportedPlugin).toLowerCase()!==realpathSync(expectedPlugin).toLowerCase())
+    fail('Windows textoverlay plugin loaded from outside the packaged native runtime');
+  console.log('PASS: packaged Windows GStreamer textoverlay plugin loaded from verified bundle');
 }
 if(process.argv.includes('--win7')) {
   if(process.platform!=='win32'||process.arch!=='x64') fail('Win7 候选包须在 Windows x64 宿主运行');

@@ -99,7 +99,7 @@ $version = & $inspect --version
 if ($LASTEXITCODE -ne 0 -or ($version -join "`n") -notmatch '\b1\.24\.13\b') {
   throw "Unexpected GStreamer runtime version at $root ($($version -join '; '))"
 }
-foreach ($target in @('avdec_h264', 'avdec_aac')) {
+foreach ($target in @('avdec_h264', 'avdec_aac', 'textoverlay')) {
   & $inspect $target | Out-Null
   if ($LASTEXITCODE -ne 0) { throw "GStreamer plugin smoke failed: $target at $root" }
 }

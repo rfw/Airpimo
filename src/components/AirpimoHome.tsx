@@ -1,7 +1,6 @@
 import {
   ClipboardCopy,
   LoaderCircle,
-  MonitorSmartphone,
   Play,
   Settings,
   Square,
@@ -10,6 +9,8 @@ import { brand } from "../brand";
 import { type Snapshot, showRestartPrompt, issueHint } from "../domain/state";
 import { homeStatus } from "../domain/home-status";
 import { isDesktop } from "../lib/desktop";
+import { AirpimoSignal } from "./AirpimoSignal"
+import { ScreenMirroringGuide } from "./ScreenMirroringGuide"
 
 export interface AirpimoHomeProps {
   snapshot: Snapshot;
@@ -110,57 +111,53 @@ export function AirpimoHome({
 
       <main className="airpimo-content">
         <div className="airpimo-center">
-          <div className="airpimo-hero" aria-hidden="true">
-            <div className="airpimo-hero-inner">
-              <MonitorSmartphone size={40} strokeWidth={1.85} />
-            </div>
-          </div>
-          <section className="airpimo-device" aria-label="投屏设备名称">
-            <span className="airpimo-device-label">投屏设备名称</span>
-            <div className="airpimo-device-row">
-              <strong className="airpimo-device-name" title={name}>
-                {name}
-              </strong>
-              <button
-                className="airpimo-copy"
+          <AirpimoSignal size={220} animated={active} />
+
+          <div className={"flex flex-col items-center gap-"}>
+            <section className="airpimo-device" aria-label="投屏设备名称">
+              <span className="airpimo-device-label">投屏设备名称</span>
+              <div className="airpimo-device-row">
+                <strong className="airpimo-device-name" title={name}>
+                  {name}
+                </strong>
+                <button
+                    className="airpimo-copy"
+                    type="button"
+                    aria-label="复制投屏设备名称"
+                    title="复制设备名称"
+                    onClick={() => onCopy(name)}
+                >
+                  <ClipboardCopy size={16} strokeWidth={1.9} />
+                </button>
+              </div>
+            </section>
+            <button
+                className={`airpimo-primary ${active ? "is-stop" : ""}`}
                 type="button"
-                aria-label="复制投屏设备名称"
-                title="复制设备名称"
-                onClick={() => onCopy(name)}
-              >
-                <ClipboardCopy size={16} strokeWidth={1.9} />
-              </button>
-            </div>
-          </section>
-          <button
-            className={`airpimo-primary ${active ? "is-stop" : ""}`}
-            type="button"
-            onClick={onPrimaryAction}
-            disabled={disabled}
-            aria-label={label}
-          >
-            {busy || starting ? (
-              <LoaderCircle
-                className="animate-spin"
-                size={16}
-                aria-hidden="true"
-              />
-            ) : active ? (
-              <Square size={14} fill="currentColor" aria-hidden="true" />
-            ) : (
-              <Play size={17} fill="currentColor" aria-hidden="true" />
-            )}
-            <span>{label}</span>
-          </button>
+                onClick={onPrimaryAction}
+                disabled={disabled}
+                aria-label={label}
+            >
+              {busy || starting ? (
+                  <LoaderCircle
+                      className="animate-spin"
+                      size={16}
+                      aria-hidden="true"
+                  />
+              ) : active ? (
+                  <Square size={14} fill="currentColor" aria-hidden="true" />
+              ) : (
+                  <Play size={17} fill="currentColor" aria-hidden="true" />
+              )}
+              <span>{label}</span>
+            </button>
+          </div>
+
+          <div className="w-full">
+            <ScreenMirroringGuide deviceName={name} />
+          </div>
+
         </div>
-        <p
-          className="airpimo-guide"
-          title={`iPhone 控制中心 → 屏幕镜像 → ${name}`}
-        >
-          iPhone 控制中心 <span aria-hidden="true">→</span> 屏幕镜像{" "}
-          <span aria-hidden="true">→</span>{" "}
-          <span className="airpimo-guide-device">{name}</span>
-        </p>
       </main>
 
       <footer className="airpimo-footer">

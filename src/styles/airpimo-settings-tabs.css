@@ -20,7 +20,7 @@
 @media(max-height:390px) { .airpimo-settings-tab { padding: 5px 2px; }.airpimo-settings-body { padding-top: 5px; } }
 
 /* Expert receiver parameters: readable and keyboard-friendly in both themes. */
-.airpimo-expert-args { margin-top: 14px; padding-top: 12px; border-top: 1px solid hsl(var(--border)); min-width: 0; }
+.airpimo-expert-args { margin-top: 14px; padding-top: 12px; min-width: 0; }
 .airpimo-expert-input { box-sizing: border-box; display: block; width: 100%; resize: vertical; min-height: 66px; margin-top: 7px; padding: 9px 10px; border: 1px solid hsl(var(--input)); border-radius: 7px; background: hsl(var(--background)); color: hsl(var(--foreground)); font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; outline-offset: 2px; }
 .airpimo-expert-input:focus-visible { outline: 2px solid hsl(var(--ring)); }
 .airpimo-expert-warning { margin: 8px 0 5px; color: hsl(var(--destructive)); font-size: 11px; line-height: 1.6; }

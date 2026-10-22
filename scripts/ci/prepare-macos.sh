@@ -14,7 +14,7 @@ export HOMEBREW_PREFIX="$BREW_PREFIX"
 export PATH="$BREW_PREFIX/bin:$PATH"
 export PKG_CONFIG_PATH="$BREW_PREFIX/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
 command -v gst-inspect-1.0
-for element in avdec_h264 avdec_aac level; do
+for element in avdec_h264 avdec_aac level textoverlay; do
   gst-inspect-1.0 "$element" > /dev/null || { echo "Missing required GStreamer element: $element" >&2; exit 2; }
 done
 # Homebrew may not link its private libexec tools into /opt/homebrew or

@@ -15,6 +15,7 @@ function fixture(callback) {
     'gstreamer/lib/gstreamer-1.0/libgstcoreelements.dylib',
     'gstreamer/lib/gstreamer-1.0/libgstlibav.dylib',
     'gstreamer/lib/gstreamer-1.0/libgstlevel.dylib',
+    'gstreamer/lib/gstreamer-1.0/libgstpango.dylib',
     'gstreamer/lib/gstreamer-1.0/libgstgl.dylib',
     'gstreamer/lib/libgstreamer-1.0.0.dylib',
     'gstreamer/lib/libgstcodec.dylib',
@@ -36,7 +37,7 @@ function fixture(callback) {
     calls.push([tool,args]);
     if(tool===inspector) {
       const element=args[0];
-      const filename=element==='level'?'libgstlevel.dylib':element==='glimagesink'?'libgstgl.dylib':element.startsWith('avdec_')?'libgstlibav.dylib':'libgstcoreelements.dylib';
+      const filename=element==='textoverlay'?'libgstpango.dylib':element==='level'?'libgstlevel.dylib':element==='glimagesink'?'libgstgl.dylib':element.startsWith('avdec_')?'libgstlibav.dylib':'libgstcoreelements.dylib';
       if(!REQUIRED_ELEMENTS.includes(element)&&element!=='glimagesink')return {status:1,stdout:'',stderr:'missing optional'};
       return {status:0,stdout:`Factory Details:\n  Filename                ${join(gst,'lib/gstreamer-1.0',filename)}\n`};
     }
@@ -60,6 +61,8 @@ test('macOS runtime pruning retains required GStreamer elements and transitive M
   assert.ok(result.selectedPlugins.includes('gstreamer/lib/gstreamer-1.0/libgstlibav.dylib'));
   assert.ok(result.selectedPlugins.includes('gstreamer/lib/gstreamer-1.0/libgstlevel.dylib'), 'UxPlay audio pipeline needs level');
   assert.ok(result.provided.includes('level'));
+  assert.ok(result.selectedPlugins.includes('gstreamer/lib/gstreamer-1.0/libgstpango.dylib'));
+  assert.ok(result.provided.includes('textoverlay'));
   for(const optional of ['libgstpython.dylib','libharfbuzz-icu.0.dylib','libnode.127.dylib','libsoup-3.0.0.dylib'])
     assert.ok(result.removed.some(name=>name.endsWith(optional)),optional);
   assert.equal(result.kept.length+result.removed.length,names.length);
@@ -107,7 +110,7 @@ test('macOS cloud preparation prunes only staged native files before relocation'
   const pkg=JSON.parse(readFileSync(new URL('../package.json',import.meta.url),'utf8'));
   assert.equal(pkg.scripts['native:prune:mac'],'node scripts/prune-macos-native.mjs');
   assert.match(src,/--gst "\$BREW_PREFIX" --apply/);
-  assert.match(src,/for element in avdec_h264 avdec_aac level;/);
+  assert.match(src,/for element in avdec_h264 avdec_aac level textoverlay;/);
 });
 
 test('macOS packaged smoke rejects a Homebrew plugin escape even if gst-inspect reports success',async()=>{
@@ -128,6 +131,15 @@ test('macOS packaged smoke rejects a Homebrew plugin escape even if gst-inspect 
   }finally{rmSync(folder,{recursive:true,force:true});}
 });
 
+
+test('macOS release pruning refuses missing watermark textoverlay even with other decoders',()=>fixture(({resources,gst,run,manifestPath})=>{
+  const missing=(tool,args)=>tool.endsWith('gst-inspect-1.0')&&args[0]==='textoverlay'
+    ?{status:1,stdout:'',stderr:'No such element or plugin'}:run(tool,args);
+  const result=planMacPrune(resources,{gst,run:missing});
+  assert.equal(result.ok,false);
+  assert.match(result.problems.join('\n'),/Missing required GStreamer element\/plugin: textoverlay/);
+  assert.equal(JSON.parse(readFileSync(manifestPath,'utf8')).ready,true);
+}));
 
 test('macOS release pruning refuses missing level audio plugin even with AAC/H.264 available',()=>fixture(({resources,gst,run,manifestPath})=>{
   const missing=(tool,args)=>tool.endsWith('gst-inspect-1.0')&&args[0]==='level'

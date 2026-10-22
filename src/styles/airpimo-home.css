@@ -41,35 +41,10 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: space-around;
   width: 100%;
   min-width: 0;
   flex: 1;
-}
-.airpimo-hero {
-  width: 124px;
-  height: 124px;
-  border-radius: 50%;
-  flex: 0 0 124px;
-  margin-bottom: 80px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-bottom: 60px;
-  background: radial-gradient(
-    circle,
-    rgba(31, 117, 255, 0.105) 0 45%,
-    rgba(31, 117, 255, 0.06) 45% 70%,
-    rgba(31, 117, 255, 0.025) 70% 100%
-  );
-  box-shadow: inset 0 0 0 1px rgba(44, 116, 224, 0.045);
-}
-.airpimo-hero-inner {
-  width: 50px;
-  height: 50px;
-  color: #1379ff;
-  display: grid;
-  place-items: center;
 }
 .airpimo-device {
   display: flex;
@@ -126,14 +101,14 @@
   justify-content: center;
   align-items: center;
   gap: 9px;
-  margin-top: 30px;
-  min-width: 129px;
-  height: 35px;
+  margin-top: 20px;
+  min-width: 140px;
+  height: 38px;
   padding: 0 17px;
   border-radius: 999px;
   border: 1px solid #247df1;
   background: #1677fb;
-  color: white;
+  color: #eaeaea;
   font-size: 13px;
   font-weight: 550;
   box-shadow: 0 3px 9px rgba(23, 116, 243, 0.15);
@@ -168,21 +143,7 @@
   flex: 1 1 auto;
   min-height: 0;
 }
-.airpimo-guide {
-  color: hsl(var(--muted-foreground));
-  font-size: 11.5px;
-  margin: 10px 0 0;
-  line-height: 1.5;
-  max-width: 100%;
-  text-align: center;
-  overflow-wrap: anywhere;
-}
-.airpimo-guide > span[aria-hidden] {
-  margin: 0 3px;
-}
-.airpimo-guide-device {
-  font-weight: 500;
-}
+
 .airpimo-footer {
   flex: 0 0 50px;
   min-height: 50px;
@@ -281,51 +242,7 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
-@media (max-width: 450px) {
-  .airpimo-footer {
-    padding: 0 12px;
-  }
-  .airpimo-footer-actions {
-    gap: 6px;
-  }
-  .airpimo-status {
-    gap: 7px;
-    font-size: 11px;
-  }
-  .airpimo-device-name {
-    font-size: 16px;
-  }
-  .airpimo-guide {
-    font-size: 10.5px;
-  }
-}
-@media (max-height: 390px) {
-  .airpimo-hero {
-    width: 94px;
-    height: 94px;
-    flex-basis: 94px;
-  }
-  .airpimo-hero-inner {
-    transform: scale(0.84);
-  }
-  .airpimo-device {
-    margin-top: 5px;
-  }
-  .airpimo-primary {
-    margin-top: 10px;
-  }
-  .airpimo-guide {
-    margin-top: 8px;
-  }
-  .airpimo-footer {
-    flex-basis: 45px;
-    min-height: 45px;
-  }
-  .airpimo-header {
-    height: 42px;
-    min-height: 42px;
-  }
-}
+
 @media (prefers-reduced-motion: reduce) {
   .airpimo-primary {
     transition: none;
@@ -344,4 +261,25 @@
   top: 1px;
   right: 1px;
   background: #3986ee;
+}
+
+
+@keyframes airpimo-water-ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+
+  85% {
+    opacity: 0.25;
+  }
+
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
 }
