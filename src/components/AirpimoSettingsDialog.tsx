@@ -203,7 +203,7 @@ export function AirpimoSettingsDialog({
               <div className="flex items-center justify-between border-b border-border px-px py-2 [&_strong]:block [&_strong]:text-xs [&_strong]:font-semibold [&_small]:mt-1 [&_small]:block [&_small]:text-[10px] [&_small]:text-muted-foreground">
                 <div>
                   <strong>关闭后驻留托盘</strong>
-                  <small>开启：关闭窗口后隐藏到托盘，继续接收。关闭：退出软件。</small>
+                  <small>开启：关闭窗口后隐藏到托盘。关闭：退出软件。</small>
                 </div>
                 <Switch
                     aria-label="关闭后驻留托盘"

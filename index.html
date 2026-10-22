@@ -15,5 +15,8 @@
 </div>
 <div id="root"></div>
 <script type="module" src="/src/main.tsx"></script>
+<script type="module">
+    if (import.meta.env.PROD) { document.addEventListener( "contextmenu", (event) => event.preventDefault(), true, ); }
+</script>
 </body>
 </html>
