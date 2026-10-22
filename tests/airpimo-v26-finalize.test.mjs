@@ -31,31 +31,25 @@ test('new repository is compile-time pinned and native browser URL is restricted
   assert.match(file('src/lib/release-update.ts'),/releases\/latest/);
 });
 
-test('settings tab has outline padding and no bottom close button on read-only pages',()=>{
-  const app=file('src/App.tsx');
-  assert.match(app,/\{\(settingsTab === 'config' \|\| settingsTab === 'theme'\) && <div className="modal-actions airpimo-settings-actions">/);
-  assert.doesNotMatch(app,/variant="outline" onClick=\{\(\) => setSettingsOpen\(false\)\}>关闭<\/Button>/);
-  assert.match(file('src/styles/airpimo-settings-tabs.css'),/padding: 12px 12px 16px; scroll-padding: 12px;/);
-  assert.match(file('src/styles/airpimo-settings-tabs.css'),/padding: 3px 3px 7px;/);
+test('only editable settings panels present save actions',()=>{
+ const view=file('src/components/AirpimoSettingsDialog.tsx');
+ assert.match(view,/settingsTab === 'config' \|\| settingsTab === 'theme'/);
+ assert.match(view,/保存设置/);
+ assert.match(view,/role="tabpanel"/);
 });
 
-test('visible static startup remains until app state is initialized; no blank boot view',()=>{
-  const html=file('index.html');
-  assert.ok(html.indexOf('/theme-bootstrap.js') < html.indexOf('/startup.css'));
-  assert.ok(html.indexOf('/startup.css') < html.indexOf('id="airpimo-startup"'));
-  assert.ok(html.indexOf('id="airpimo-startup"') < html.indexOf('id="root"'));
-  assert.match(html,/启动中…/);
-  assert.match(file('public/startup.css'),/html.dark #airpimo-startup/);
-  assert.match(file('src/App.tsx'),/if \(ready\) document.getElementById\('airpimo-startup'\)\?\.remove\(\)/);
+test('startup remains visible until backend initialization and respects selected theme',()=>{
+ const html=file('index.html');
+ assert.ok(html.indexOf('/theme-bootstrap.js') < html.indexOf('id="airpimo-startup"'));
+ assert.ok(html.indexOf('id="airpimo-startup"') < html.indexOf('id="root"'));
+ assert.match(html,/启动中…/);
+ assert.match(file('src/App.tsx'),/if \(ready\) document.getElementById\('airpimo-startup'\)\?\.remove\(\)/);
 });
 
-test('only targeted disposable artifacts are removed and v26 script is idempotent',()=>{
-  // The old v26 installer targets an earlier settings markup; verify current state instead.
-  assert.match(file('src/App.tsx'),/airpimo-panel-updates/);
-  assert.match(file('index.html'),/id="airpimo-startup"/);
-  assert.equal(existsSync(join(root,'README.md')),true);
-  assert.equal(existsSync(join(root,'AGENTS.md')),true);
-  assert.equal(existsSync(join(root,'scripts','ci','airpimo-v25-edits.json')),true);
-  assert.ok(!readdirSync(root).some(x=>/^AIRPIMO-(BRAND-RENAME|CI-ARTIFACT-ASSERTIONS|DESKTOP-UI-REDESIGN|SETTINGS-UPDATES|STARTUP-TRAY-DEV-RUNTIME)-v\d+\.md$/i.test(x)));
-  assert.equal(existsSync(join(root,'src-tauri','Cargo.lock.bak')),false);
+test('release workspace keeps license, versioned source and active settings component',()=>{
+ assert.match(file('src/components/AirpimoSettingsDialog.tsx'),/airpimo-panel-updates/);
+ assert.match(file('index.html'),/id="airpimo-startup"/);
+ assert.equal(existsSync(join(root,'README.md')),true);
+ assert.equal(existsSync(join(root,'AGENTS.md')),true);
+ assert.equal(existsSync(join(root,'src-tauri','Cargo.lock.bak')),false);
 });

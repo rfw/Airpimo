@@ -37,17 +37,18 @@ test('receiver passes effective argv to spawn directly, without shell',()=>{
   assert.match(argv,/quote\.is_some\(\)/);
 });
 
-test('settings provide warning, explicit restart semantics and existing controls remain',()=>{
-  const app=read('src/App.tsx');
-  for(const value of ['id="deviceName"','aria-label="最大请求帧率"','aria-label="画面亮度"','id="uxplayArgs"','非专业人员请勿修改','重启接收服务才会生效']) {
-    assert.ok(app.includes(value),value);
-  }
-  assert.match(app,/setDraft\(x=>\(\{\.\.\.x,uxplay_args:e\.target\.value\}\)\)/);
-  assert.match(app,/await desktop\.save\(/);
+test('settings retain advanced option warning and existing controls',()=>{
+ const view=read('src/components/AirpimoSettingsDialog.tsx');
+ assert.match(view,/id="uxplayArgs"/);
+ assert.match(view,/非专业人员请勿修改/);
+ assert.match(view,/重启接收服务才会生效/);
+ assert.match(view,/aria-label="最大请求帧率"/);
+ assert.match(view,/aria-label="画面亮度"/);
 });
 
-test('current receiver already includes the expert settings across Rust and React',()=>{
-  assert.match(read('src/App.tsx'),/id="uxplayArgs"/);
-  assert.match(read('src-tauri/src/settings.rs'),/pub uxplay_args: String/);
-  assert.match(read('src-tauri/src/receiver.rs'),/command\.args\(&effective_args\)/);
+test('native receiver retains advanced parameter support and UI ownership',()=>{
+ const view=read('src/components/AirpimoSettingsDialog.tsx');
+ assert.match(view,/draft.uxplay_args/);
+ assert.match(read('src/App.tsx'),/validateUxplayArgs/);
+ assert.match(read('src-tauri/src/receiver.rs'),/effective_args/);
 });

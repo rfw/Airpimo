@@ -2,8 +2,8 @@
 import { MonitorSmartphone } from "lucide-react";
 
 interface AirpimoSignalProps {
-    size?: number;
-    animated?: boolean;
+  size?: 182 | 220;
+  animated?: boolean;
 }
 
 const rippleClass = `
@@ -18,24 +18,24 @@ const rippleClass = `
 `;
 
 export function AirpimoSignal({
-                                  size = 182,
-                                  animated = true,
-                              }: AirpimoSignalProps) {
-    return (
-        <div
-            role="img"
-            aria-label="Airpimo 投屏接收"
-            className="
+  size = 182,
+  animated = true,
+}: AirpimoSignalProps) {
+  return (
+    <div
+      role="img"
+      aria-label="Airpimo 投屏接收"
+      className={`
         relative isolate shrink-0
         overflow-hidden rounded-full
         bg-[radial-gradient(circle,#ffffff_0%,#f4f9ff_60%,#ffffff00_100%)]
         dark:bg-[radial-gradient(circle,#253449_0%,#192334_60%,#11182700_100%)]
-      "
-            style={{ width: size, height: size }}
-        >
-            {/* 浅蓝色背景圆 */}
-            <div
-                className="
+      ${size === 220 ? "size-[220px]" : "size-[182px]"}
+      `}
+    >
+      {/* 浅蓝色背景圆 */}
+      <div
+        className="
           absolute inset-[13%] rounded-full
           border
           border-blue-200/25
@@ -43,26 +43,26 @@ export function AirpimoSignal({
           bg-white/20
           dark:bg-black/10
         "
-            />
+      />
 
-            {/* 动态水波纹 */}
-            {animated && (
-                <>
-                    <div className={rippleClass} />
+      {/* 动态水波纹 */}
+      {animated && (
+        <>
+          <div className={rippleClass} />
 
-                    <div
-                        className={`${rippleClass} [animation-delay:-1.6s]`}
-                    />
+          <div
+            className={`${rippleClass} [animation-delay:-1.6s]`}
+          />
 
-                    <div
-                        className={`${rippleClass} [animation-delay:-3.2s]`}
-                    />
-                </>
-            )}
+          <div
+            className={`${rippleClass} [animation-delay:-3.2s]`}
+          />
+        </>
+      )}
 
-            {/* 中心圆与图标 */}
-            <div
-                className="
+      {/* 中心圆与图标 */}
+      <div
+        className="
           absolute inset-[29%] z-10
           flex items-center justify-center
           rounded-full
@@ -73,12 +73,12 @@ export function AirpimoSignal({
           dark:bg-white/5
           shadow-[0_3px_16px_rgba(70,134,225,0.08)]
         "
-            >
-                <MonitorSmartphone
-                    className="size-[52%] text-blue-500"
-                    strokeWidth={2.2}
-                />
-            </div>
-        </div>
-    );
+      >
+        <MonitorSmartphone
+          className="size-[52%] text-blue-500"
+          strokeWidth={2.2}
+        />
+      </div>
+    </div>
+  );
 }

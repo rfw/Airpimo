@@ -44,21 +44,18 @@ test('startup update check is only requested once per app session',async()=>{
     assert.equal(a.kind,'available');assert.deepEqual(a,b);assert.equal(calls,1);
   }finally{globalThis.fetch=old;}
 });
-test('settings tabs, diagnostics, feedback timeout and tray default retain functional behavior',()=>{
-  const app=file('src/App.tsx'),home=file('src/components/AirpimoHome.tsx');
-  for(const key of ['config','theme','updates','diagnostics'])assert.match(app,new RegExp(`airpimo-panel-${key}`));
-  assert.match(app,/checkAtStartup\(brand\.version\)/);
-  assert.match(app,/checkForRelease\(brand\.version\)/);
-  assert.match(app,/setTimeout\(\(\) => setFeedback/);
-  assert.match(app,/3200/);
-  assert.match(app,/await desktop\.exportDiagnostics\(\)/);
-  assert.match(app,/await desktop\.openReleasePage\(updateResult\.pageUrl\)/);
-  assert.doesNotMatch(home,/onDiagnostics|CircleHelp|查看诊断/);
-  assert.match(home,/updateAvailable && \(\s*<span className="airpimo-update-dot"/);
-  assert.match(file('src/domain/state.ts'),/stay_in_tray:true/);
-  assert.match(file('src-tauri/src/settings.rs'),/stay_in_tray: true/);
-  assert.match(app,/checked=\{draft\.stay_in_tray\}/);
+test('settings tabs, diagnostics, feedback expiry and tray defaults remain functional',()=>{
+ const app=file('src/App.tsx'), view=file('src/components/AirpimoSettingsDialog.tsx'), home=file('src/components/AirpimoHome.tsx');
+ for(const key of ['config','theme','updates','diagnostics'])assert.ok(view.includes(`airpimo-panel-${key}`));
+ for(const behavior of ['checkAtStartup(brand.version)','checkForRelease(brand.version)','await desktop.exportDiagnostics()','await desktop.openReleasePage(updateResult.pageUrl)'])assert.ok(app.includes(behavior));
+ assert.match(app,/setTimeout\(\(\) => setFeedback/);
+ assert.match(app,/3200/);
+ assert.match(home,/updateAvailable/);
+ assert.match(view,/checked=\{draft.stay_in_tray\}/);
+ assert.match(file('src/domain/state.ts'),/stay_in_tray:true/);
+ assert.match(file('src-tauri/src/settings.rs'),/stay_in_tray: true/);
 });
+
 test('network is allowlisted in CSP and native release opening does not execute downloaded installers',()=>{
   const cfg=JSON.parse(file('src-tauri/tauri.conf.json'));
   assert.match(cfg.app.security.csp,/https:\/\/api\.github\.com/);

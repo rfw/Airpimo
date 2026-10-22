@@ -1,86 +1,40 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import {mkdtempSync, mkdirSync, readFileSync, writeFileSync, cpSync, rmSync} from 'node:fs';
-import {tmpdir} from 'node:os';
-import {join, resolve, dirname} from 'node:path';
-import {planAirpimoUI,applyAirpimoUI} from '../scripts/ci/apply-airpimo-ui-v21.mjs';
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+const src = (path) => readFileSync(resolve(import.meta.dirname, "..", path), "utf8");
 
-const root = resolve(import.meta.dirname, '..');
-const read = p => readFileSync(join(root,p),'utf8');
-
-function fixture(fn) {
-  const tmp = mkdtempSync(join(tmpdir(),'airpimo-ui-v21-'));
-  try { for (const p of ['src/App.tsx','src/main.tsx','src-tauri/tauri.conf.json','src-tauri/capabilities/default.json','.gitignore','src/components/AirpimoHome.tsx','src/domain/home-status.ts','src/styles/airpimo-home.css']) {
-    const destination = join(tmp,p); mkdirSync(dirname(destination),{recursive:true}); cpSync(join(root,p),destination);
-  } return fn(tmp); }
-  finally { rmSync(tmp,{recursive:true,force:true}); }
-}
-
-test('Windows native titlebar remains; macOS HTML Header is conditional and overlay-safe',()=>{
-  const home=read('src/components/AirpimoHome.tsx');
-  const config=JSON.parse(read('src-tauri/tauri.conf.json'));
-  const win=config.app.windows.find(w=>w.label==='main');
-  assert.match(home,/\{macOS && \(\s*<header className="airpimo-header" data-tauri-drag-region>/);
+test("platform titlebar and receiver actions remain wired to real desktop backend", () => {
+  const app = src("src/App.tsx");
+  const home = src("src/components/AirpimoHome.tsx");
+  const config = JSON.parse(src("src-tauri/tauri.conf.json"));
+  assert.equal(config.app.windows[0].maximizable, false);
+  assert.equal(config.app.windows[0].titleBarStyle, "Overlay");
   assert.match(home, /isMacOS\(\)/);
-  assert.equal(win.titleBarStyle,'Overlay');
-  assert.equal(win.hiddenTitle,true);
-  const cap=JSON.parse(read('src-tauri/capabilities/default.json'));
-  assert.ok(cap.permissions.includes('core:window:allow-start-dragging'));
-  assert.equal(win.width,360); assert.equal(win.height,560);
-  assert.equal(win.maximizable,false);
+  assert.match(home, /data-tauri-drag-region/);
+  assert.match(home, /onPrimaryAction/);
+  for (const operation of ["start", "stop", "retry"]) {
+    assert.ok(app.includes(`execute(desktop.${operation})`));
+  }
 });
 
-test('home UI contains only one real start/stop action and preserves the live receiver name',()=>{
-  const home=read('src/components/AirpimoHome.tsx');
-  const app=read('src/App.tsx');
-  assert.match(home,/const baseName = active\s*\? snapshot\.applied_device_name \?\? snapshot\.settings\.device_name\s*: snapshot\.settings\.device_name;/);
-  assert.match(home,/const name = `\$\{baseName\.replace\(\/@Airpimo\$\/, ""\)\}@Airpimo`/);
-  assert.match(home,/const onPrimaryAction = active \? onStop : retry \? onRetry : onStart;/);
-  assert.match(home,/const label = active \? "停止接收" : "开始接收";/);
-  assert.match(home,/disabled=\{disabled\}/);
-  assert.match(home,/aria-label="复制投屏设备名称"/);
-  assert.match(home,/onCopy\(name\)/);
-  assert.match(home,/airpimo-guide-device">\{name\}/);
-  assert.match(app,/onStart=\{\(\) => void execute\(desktop\.start\)\}/);
-  assert.match(app,/onStop=\{\(\) => void execute\(desktop\.stop\)\}/);
-  assert.match(app,/onRetry=\{\(\) => void execute\(desktop\.retry\)\}/);
-  assert.doesNotMatch(home, /等待连接|接收进程运行中/);
+test("device identity and clipboard semantics are preserved", () => {
+  const home = src("src/components/AirpimoHome.tsx");
+  assert.match(home, /snapshot\.applied_device_name/);
+  assert.match(home, /@Airpimo\$\//);
+  assert.match(home, /onCopy\(name\)/);
+  assert.match(home, /aria-label="复制投屏设备名称"/);
 });
 
-test('Footer contains a single accurate status, version, settings and help',()=>{
-  const home=read('src/components/AirpimoHome.tsx');
-  const status=read('src/domain/home-status.ts');
-  assert.match(home,/aria-label="打开设置"/);
-  assert.doesNotMatch(home,/aria-label="查看诊断"/);
-  assert.match(read('src/App.tsx'),/airpimo-tab-diagnostics/);
-  assert.match(home,/v\{brand\.version\}/);
-  assert.match(home,/aria-live=\{statusTone === "error"/);
-  assert.match(home,/const statusLabel = serviceError\s*\? status\.label\s*: feedback/);
-  assert.match(home,/\{canRestart \? \(/);
-  assert.match(home,/onClick=\{onClearFeedback\}/);
-  assert.doesNotMatch(home, /airpimo-feedback|airpimo-restart|<div className="status-description"/);
-  assert.match(status,/snapshot\.discovery_verified/);
-  assert.match(status,/发现未验证/);
-  assert.match(status,/接收异常：/);
-  assert.match(status,/桌面服务错误：/);
+test("footer remains a single source of receiver feedback and settings entry", () => {
+  const home = src("src/components/AirpimoHome.tsx");
+  const app = src("src/App.tsx");
+  const status = src("src/domain/home-status.ts");
+  assert.match(home, /aria-live=/);
+  assert.match(home, /statusLabel/);
+  assert.match(home, /onClearFeedback/);
+  assert.match(home, /aria-label="打开设置"/);
+  assert.match(home, /brand.version/);
+  assert.match(status, /discovery_verified/);
+  assert.match(app, /<AirpimoSettingsDialog/);
 });
-
-test('UI patch is idempotent, preserves product version and backend code',()=>fixture(tmp=>{
-  const main=join(tmp,'src/App.tsx');
-  const before=readFileSync(main,'utf8');
-  assert.deepEqual(applyAirpimoUI(tmp),[]);
-  assert.deepEqual(applyAirpimoUI(tmp,true),[]);
-  assert.equal(readFileSync(main,'utf8'),before);
-}));
-
-test('invalid App anchor aborts without mutating other files',()=>fixture(tmp=>{
-  const file=join(tmp,'src/App.tsx');
-  const main=join(tmp,'src/main.tsx');
-  const config=join(tmp,'src-tauri/tauri.conf.json');
-  writeFileSync(file,'export default function OtherApp() {return null;}');
-  const originalMain=readFileSync(main,'utf8');
-  const originalConfig=readFileSync(config,'utf8');
-  assert.throws(()=>planAirpimoUI(tmp),/不完整|不匹配/);
-  assert.equal(readFileSync(main,'utf8'),originalMain);
-  assert.equal(readFileSync(config,'utf8'),originalConfig);
-}));

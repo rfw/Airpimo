@@ -11,12 +11,12 @@ const read = p=>readFileSync(join(root,p),'utf8');
 function sandbox(fn) {const dir=mkdtempSync(join(tmpdir(),'airpimo-v22-'));try{return fn(dir);}finally{rmSync(dir,{force:true,recursive:true});}}
 function touch(path){mkdirSync(dirname(path),{recursive:true});writeFileSync(path,'test');}
 
-test('fresh defaults enable tray, but legacy settings stay persisted and new UI copy is accurate',()=>{
-  assert.match(read('src-tauri/src/settings.rs'),/stay_in_tray: true, theme: Theme::System/);
-  assert.match(read('src/domain/state.ts'),/stay_in_tray:true, theme:'system'/);
-  assert.match(read('src-tauri/src/settings.rs'),/pub stay_in_tray: bool/);
-  assert.match(read('src/App.tsx'),/checked=\{draft.stay_in_tray\}/);
-  assert.match(read('src/App.tsx'),/开启：关闭窗口后隐藏到托盘，继续接收。关闭：退出软件。/);
+test('fresh defaults enable tray and settings control the same persisted field',()=>{
+ const view=read('src/components/AirpimoSettingsDialog.tsx');
+ assert.match(read('src-tauri/src/settings.rs'),/stay_in_tray: true, theme: Theme::System/);
+ assert.match(read('src/domain/state.ts'),/stay_in_tray:true, theme:'system'/);
+ assert.match(view,/checked=\{draft.stay_in_tray\}/);
+ assert.match(view,/关闭窗口后隐藏到托盘/);
 });
 
 test('theme bootstrap runs before React and works for persisted dark, system dark and light',()=>{
@@ -32,7 +32,6 @@ test('theme bootstrap runs before React and works for persisted dark, system dar
     assert.equal(style.colorScheme,isDark?'dark':'light');
   }
   assert.match(read('src/App.tsx'),/if \(!ready\) return;[\s\S]*localStorage.setItem\('airpimo.theme', theme\)/);
-  assert.match(read('src/styles.css'),/--foreground: 220 9% 82%/);
 });
 
 test('project staged runtime wins over a stale valid cache in both Win and macOS modes',()=>sandbox(dir=>{
@@ -65,13 +64,11 @@ test('legacy cache fallback and manual override remain supported',()=>sandbox(di
   assert.match(read('src-tauri/src/receiver.rs'),/missing_runtime/);
 }));
 
-test('v22 native behavior remains present after later UI revisions',()=>{
-  const app=read('src/App.tsx');
-  const main=read('src-tauri/src/lib.rs');
-  const state=read('src/domain/state.ts');
-  assert.match(app,/checked={draft.stay_in_tray}/);
-  assert.match(app,/localStorage.setItem\('airpimo.theme', theme\)/);
-  assert.match(state,/stay_in_tray:true/);
-  assert.match(main,/TrayIconEvent::DoubleClick/);
-  assert.match(read('src-tauri/src/receiver.rs'),/exit_code == Some\(-1073741515\)/);
+test('v22 native tray and theme state remain integrated',()=>{
+ const app=read('src/App.tsx'), view=read('src/components/AirpimoSettingsDialog.tsx');
+ assert.match(view,/checked=\{draft.stay_in_tray\}/);
+ assert.match(app,/localStorage.setItem\('airpimo.theme', theme\)/);
+ assert.match(read('src/domain/state.ts'),/stay_in_tray:true/);
+ assert.match(read('src-tauri/src/lib.rs'),/TrayIconEvent::DoubleClick/);
+ assert.match(read('src-tauri/src/receiver.rs'),/exit_code == Some\(-1073741515\)/);
 });

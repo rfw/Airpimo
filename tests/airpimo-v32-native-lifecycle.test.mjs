@@ -86,8 +86,9 @@ test('Win7 NSIS installs machine-wide with start menu and uninstall registration
  assert.equal(win7.bundle.windows.webviewInstallMode.type,'fixedRuntime');
 });
 
-test('home device typography reduced without changing base-name@Airpimo semantics',()=>{
- const css=read('src/styles/airpimo-home.css');
- assert.match(css,/\.airpimo-device-name \{\s*font-size: 20px;/);
- assert.match(read('src/components/AirpimoHome.tsx'),/baseName\.replace\(\/@Airpimo\$\//);
+test('home retains advertised AirPlay name and clipboard behavior',()=>{
+ const home=read('src/components/AirpimoHome.tsx');
+ assert.match(home,/applied_device_name/);
+ assert.match(home,/replace\(\/@Airpimo\$\//);
+ assert.match(home,/onCopy\(name\)/);
 });

@@ -92,7 +92,7 @@ test('FPS and 50% initial volume flow into UxPlay; Windows has software decoder 
 test('brightness is backed by real UxPlay -vc videobalance and retains Windows A/V sync',()=>{
   const receiver=readFileSync(new URL('../src-tauri/src/receiver.rs', import.meta.url),'utf8');
   const settings=readFileSync(new URL('../src-tauri/src/settings.rs', import.meta.url),'utf8');
-  const app=readFileSync(new URL('../src/App.tsx', import.meta.url),'utf8');
+  const app=readFileSync(new URL('../src/components/AirpimoSettingsDialog.tsx', import.meta.url),'utf8');
   const args = readFileSync(new URL('../src-tauri/src/uxplay_args.rs', import.meta.url),'utf8');
   assert.match(args,/if brightness < 100/);
   assert.match(args,/videoconvert ! videobalance brightness=/);
