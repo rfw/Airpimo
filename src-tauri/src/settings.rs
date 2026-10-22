@@ -35,7 +35,7 @@ pub fn validate_fps(value: u16) -> Result<(), String> {
 }
 impl Default for Settings {
     fn default() -> Self {
-        Self { device_name: "Airpimo".to_string(), auto_start: true, stay_in_tray: true, theme: Theme::System, fps: default_fps(), brightness: default_brightness(), uxplay_args: String::new() }
+        Self { device_name: "AirPlay".to_string(), auto_start: true, stay_in_tray: true, theme: Theme::System, fps: default_fps(), brightness: default_brightness(), uxplay_args: String::new() }
     }
 }
 pub fn validate_name(value: &str) -> Result<(), String> {
