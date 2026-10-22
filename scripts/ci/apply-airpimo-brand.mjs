@@ -94,7 +94,7 @@ export function planAirpimoBrand(root = defaultRoot) {
   });
   transform('src/brand.ts', src => {
     src = replace(src, `appName: '${oldName}'`, `appName: '${newName}'`);
-    src = replace(src, `defaultDeviceName: 'Mac-AirPlay'`, `defaultDeviceName: '${newName}'`);
+    // Device display name is user-configurable, not part of the product rebrand.
     if (/version:\s*['"][^'"]+['"]/.test(src)) {
       src = src.replace(/version:\s*['"][^'"]+['"]/, 'version: airpimoPackage.version');
     }
@@ -103,19 +103,20 @@ export function planAirpimoBrand(root = defaultRoot) {
     }
     return src;
   });
+  // Brand identity and the user-configurable AirPlay name are independent.
+  // In particular, re-running the migration must not reset AirPlay/Office/etc.
   transform('src/domain/state.ts', src => {
-    src = src.replace(/(defaultSettings[\s\S]{0,700}?device_name:\s*)'Mac-AirPlay'/, "$1'Airpimo'");
-    src = src.replace(/(defaultSnapshot[\s\S]{0,700}?device_name:\s*)'Mac-AirPlay'/, "$1'Airpimo'");
-    if (!/defaultSettings[\s\S]{0,700}?device_name:\s*'Airpimo'/.test(src) ||
-        !/defaultSnapshot[\s\S]{0,700}?device_name:\s*'Airpimo'/.test(src)) {
-      throw new Error('Frontend AirPlay defaults not migrated; inspect src/domain/state.ts');
+    const settingsDefault = src.match(/\bdefaultSettings\s*:\s*Settings\s*=\s*\{[^}]*\bdevice_name\s*:\s*(['"])([^'"\r\n]+)\1/);
+    const snapshotDefault = src.match(/\bdefaultSnapshot\s*:\s*Snapshot\s*=\s*\{[^}]*\bdevice_name\s*:\s*(['"])([^'"\r\n]+)\1/);
+    if (!settingsDefault?.[2]?.trim() || !snapshotDefault?.[2]?.trim()) {
+      throw new Error('Frontend AirPlay defaults missing or invalid; inspect src/domain/state.ts');
     }
     return src;
   });
   transform('src-tauri/src/settings.rs', src => {
-    src = src.replace(/(Self\s*\{\s*device_name:\s*)"Mac-AirPlay"/, '$1"Airpimo"');
-    if (!/Self\s*\{\s*device_name:\s*"Airpimo"/.test(src)) {
-      throw new Error('Rust AirPlay default not migrated; inspect src-tauri/src/settings.rs');
+    const rustDefault = src.match(/\bSelf\s*\{\s*device_name\s*:\s*"([^"\r\n]+)"/);
+    if (!rustDefault?.[1]?.trim()) {
+      throw new Error('Rust AirPlay default missing or invalid; inspect src-tauri/src/settings.rs');
     }
     return src;
   });

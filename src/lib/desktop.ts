@@ -12,6 +12,7 @@ export const desktop = {
   async save(settings: Settings): Promise<Snapshot> { requireDesktop(); return invoke('save_settings', { settings }); },
   async diagnostics(): Promise<string> { requireDesktop(); return invoke('get_diagnostics'); },
   async exportDiagnostics(): Promise<string> { requireDesktop(); return invoke('export_diagnostics'); },
+  async openProjectPage(): Promise<void> { requireDesktop(); return invoke('open_project_page'); },
   async openReleasePage(url: string): Promise<void> { requireDesktop(); return invoke('open_release_page', { url }); },
   async watch(cb:(value: Snapshot)=>void):Promise<UnlistenFn> { requireDesktop(); return listen<Snapshot>('receiver://snapshot', event=>cb(event.payload)); }
 };

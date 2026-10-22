@@ -41,6 +41,12 @@ fn export_diagnostics(app:AppHandle) -> Result<String,String> {
     Ok(destination.to_string_lossy().to_string())
 }
 
+// Open the public project homepage using a fixed URL, never an arbitrary frontend URL.
+#[tauri::command]
+fn open_project_page() -> Result<(),String> {
+    open_in_system_browser("https://github.com/rfw/Airpimo")
+}
+
 // Open only official GitHub release URLs in the system browser. Never run installers.
 #[tauri::command]
 fn open_release_page(url: String) -> Result<(),String> {
@@ -49,14 +55,18 @@ fn open_release_page(url: String) -> Result<(),String> {
     let valid = parts.len() == 5 && parts[2] == "releases" && parts[3] == "tag" &&
         parts[0] == "rfw" && parts[1] == "Airpimo" &&
         { let version=parts[4].strip_prefix('v').unwrap_or(parts[4]);
-          version.split('.').count() == 3 && version.split('.').all(|p| !p.is_empty() && p.bytes().all(|c| c.is_ascii_digit())) }; 
+          version.split('.').count() == 3 && version.split('.').all(|p| !p.is_empty() && p.bytes().all(|c| c.is_ascii_digit())) };
     if !valid { return Err("更新链接必须是官方仓库的稳定版 GitHub Release".into()); }
+    open_in_system_browser(&url)
+}
+
+fn open_in_system_browser(url: &str) -> Result<(),String> {
     #[cfg(target_os="windows")]
-    let result = std::process::Command::new("rundll32.exe").arg("url.dll,FileProtocolHandler").arg(&url).spawn();
+    let result = std::process::Command::new("rundll32.exe").arg("url.dll,FileProtocolHandler").arg(url).spawn();
     #[cfg(target_os="macos")]
-    let result = std::process::Command::new("open").arg(&url).spawn();
+    let result = std::process::Command::new("open").arg(url).spawn();
     #[cfg(not(any(target_os="windows",target_os="macos")))]
-    let result = std::process::Command::new("xdg-open").arg(&url).spawn();
+    let result = std::process::Command::new("xdg-open").arg(url).spawn();
     result.map(|_| ()).map_err(|e| format!("无法打开系统浏览器：{e}"))
 }
 
@@ -82,12 +92,22 @@ fn show_main(app:&AppHandle) {
         let _=window.unminimize(); let _=window.show(); let _=window.set_focus();
     }
 }
+// The native tray has exactly one receiver action. Its text tracks the
+// controller state; activation always reads the latest state again.
+struct TrayReceiverItem(MenuItem<tauri::Wry>);
+
+pub(crate) fn sync_tray_receiver_item(app: &AppHandle) {
+    if let Some(item) = app.try_state::<TrayReceiverItem>() {
+        let label = if controller(app).tray_should_stop() { "停止接收" } else { "启动接收" };
+        let _ = item.0.set_text(label);
+    }
+}
+
 fn init_tray(app:&mut tauri::App) -> tauri::Result<()> {
     let show=MenuItem::with_id(app,"show","显示主窗口",true,None::<&str>)?;
-    let start=MenuItem::with_id(app,"start","启动接收",true,None::<&str>)?;
-    let stop=MenuItem::with_id(app,"stop","停止接收",true,None::<&str>)?;
+    let receiver=MenuItem::with_id(app,"receiver","启动接收",true,None::<&str>)?;
     let quit=MenuItem::with_id(app,"quit","退出",true,None::<&str>)?;
-    let menu=Menu::with_items(app,&[&show,&start,&stop,&quit])?;
+    let menu=Menu::with_items(app,&[&show,&receiver,&quit])?;
     let icon=app.default_window_icon().expect("Tauri 配置必须包含图标").clone();
     TrayIconBuilder::new()
         .icon(icon)
@@ -96,12 +116,16 @@ fn init_tray(app:&mut tauri::App) -> tauri::Result<()> {
         .show_menu_on_left_click(false)
         .on_menu_event(|app,event| match event.id.as_ref() {
             "show"=>show_main(app),
-            "start"=>{controller(app).start(app,true);},
-            "stop"=>{controller(app).stop(app);},
+            "receiver"=>{
+                let core=controller(app);
+                if core.tray_should_stop() { core.stop(app); }
+                else { core.start(app,true); }
+            },
             "quit"=>{controller(app).stop(app);app.exit(0);},
             _=>{},
         })
         .build(app)?;
+    app.manage(TrayReceiverItem(receiver));
     Ok(())
 }
 
@@ -149,7 +173,7 @@ pub fn run() {
             if should_start { core.start(app.handle(),true); }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_snapshot,get_settings,start_receiving,stop_receiving,retry_receiving,save_settings,get_diagnostics,export_diagnostics,open_release_page])
+        .invoke_handler(tauri::generate_handler![get_snapshot,open_project_page,get_settings,start_receiving,stop_receiving,retry_receiving,save_settings,get_diagnostics,export_diagnostics,open_release_page])
         .on_window_event(|window,event| {
             if let WindowEvent::CloseRequested {api,..}=event {
                 let app=window.app_handle();

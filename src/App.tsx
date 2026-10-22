@@ -169,6 +169,18 @@ function App() {
       setFeedback(message);
     } finally { setDiagnosticsExporting(false); }
   }
+  async function openProject() {
+    if (!isDesktop()) {
+      window.open('https://github.com/rfw/Airpimo', '_blank', 'noopener,noreferrer');
+      return;
+    }
+    try {
+      await desktop.openProjectPage();
+    } catch (error) {
+      setFeedback(`打开 GitHub 失败：${String(error)}`);
+    }
+  }
+
   async function copy(value: string) {
     try { await copyText(value); setFeedback('复制成功'); }
     catch (error) { setFeedback(String(error)); }
@@ -179,7 +191,8 @@ function App() {
       snapshot={snapshot} ready={ready} busy={actionBusy} now={now} bootError={bootError} feedback={feedback}
       onStart={() => void execute(desktop.start)} onStop={() => void execute(desktop.stop)}
       onRetry={() => void execute(desktop.retry)} onCopy={(value) => void copy(value)}
-      onSettings={() => openSettings()} onClearFeedback={() => setFeedback('')} updateAvailable={updateResult?.kind === 'available'}
+      onSettings={() => openSettings()} onProject={() => void openProject()}
+      onClearFeedback={() => setFeedback('')} updateAvailable={updateResult?.kind === 'available'}
     />
 
     <AirpimoSettingsDialog

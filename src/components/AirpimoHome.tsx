@@ -1,5 +1,6 @@
 import {
   ClipboardCopy,
+  Github,
   LoaderCircle,
   Play,
   Settings,
@@ -24,6 +25,7 @@ export interface AirpimoHomeProps {
   onRetry(): void;
   onCopy(name: string): void;
   onSettings(): void;
+  onProject(): void;
   updateAvailable: boolean;
   onClearFeedback(): void;
 }
@@ -46,6 +48,7 @@ export function AirpimoHome({
   onRetry,
   onCopy,
   onSettings,
+  onProject,
   onClearFeedback,
   updateAvailable,
 }: AirpimoHomeProps) {
@@ -206,6 +209,15 @@ export function AirpimoHome({
             {updateAvailable && (
               <span className="absolute right-px top-px size-1.5 rounded-full bg-[#3986ee]" aria-label="发现新版本" />
             )}
+          </button>
+          <button
+            type="button"
+            className="grid h-7 w-[26px] place-items-center rounded-[7px] border-0 bg-transparent p-0 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            aria-label="打开 GitHub 项目主页"
+            title="GitHub"
+            onClick={onProject}
+          >
+            <Github size={16} strokeWidth={1.8} aria-hidden="true" />
           </button>
         </div>
       </footer>

@@ -23,11 +23,11 @@ test('Airpimo release package, bundle identifier and Rust crate agree',()=>{
   assert.equal(config.version,pkg.version);
 });
 
-test('Airpimo UI, default receiver, diagnostics and settings migration are consistent',()=>{
+test('Airpimo UI, configurable receiver, diagnostics and settings migration are consistent',()=>{
   assert.match(read('src/brand.ts'),/appName: 'Airpimo'/);
   assert.match(read('src/brand.ts'),/airpimoPackage.version/);
-  assert.match(read('src/domain/state.ts'),/defaultSettings[\s\S]{0,700}?device_name:\s*'Airpimo'/);
-  assert.match(read('src-tauri/src/settings.rs'),/Self\s*\{\s*device_name:\s*"Airpimo"/);
+  assert.match(read('src/domain/state.ts'),/defaultSettings[\s\S]{0,700}?device_name:\s*['"][^'"]+['"]/);
+  assert.match(read('src-tauri/src/settings.rs'),/Self\s*\{\s*device_name:\s*"[^"\r\n]+"/);
   assert.match(read('src-tauri/src/lib.rs'),/\.tooltip\("Airpimo"\)/);
   assert.match(read('src-tauri/src/lib.rs'),/fn migrate_legacy_airpimo_settings/);
   assert.match(read('src-tauri/src/lib.rs'),/migrate_legacy_airpimo_settings\(&path\)/);

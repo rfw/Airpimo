@@ -12,7 +12,7 @@ test("WebView entry registers the capture-phase context-menu blocker before Reac
   assert.ok(entry.indexOf("disableContextMenu(document)") < entry.indexOf("createRoot("));
 });
 
-test("all contextmenu events are canceled without affecting other interactions", () => {
+test("production blocks contextmenu without affecting other interactions", () => {
   const handlers = new Map();
   const target = {
     addEventListener(type, handler, capture) {
@@ -25,7 +25,7 @@ test("all contextmenu events are canceled without affecting other interactions",
       handlers.delete(type);
     },
   };
-  const uninstall = disableContextMenu(target);
+  const uninstall = disableContextMenu(target, true);
   assert.deepEqual([...handlers.keys()], ["contextmenu"]);
   for (const source of ["background", "input", "textarea", "dialog", "selection"]) {
     const event = new Event("contextmenu", { cancelable: true, bubbles: true });
@@ -43,4 +43,18 @@ test("does not remove the native tray context menu required to exit when staying
   const tray = source("src-tauri/src/lib.rs");
   assert.match(tray, /\.menu\(&menu\)/);
   assert.match(tray, /"quit"/);
+});
+
+test("development and Node tests do not intercept contextmenu", () => {
+  const calls = [];
+  const target = {
+    addEventListener: (...args) => calls.push(["add", ...args]),
+    removeEventListener: (...args) => calls.push(["remove", ...args]),
+  };
+  const uninstallDev = disableContextMenu(target, false);
+  uninstallDev();
+  // A raw Node test has no Vite import.meta.env: it must not throw.
+  const uninstallNode = disableContextMenu(target);
+  uninstallNode();
+  assert.deepEqual(calls, []);
 });

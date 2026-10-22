@@ -18,6 +18,12 @@ const LOG_LIMIT: usize = 250;
 fn start_already_in_progress(child_present: bool, stopping: bool, stage: &str) -> bool {
     child_present || (!stopping && stage == "starting")
 }
+
+// The tray offers Stop while the engine exists OR its start is in progress.
+// A failed/exited engine with no child offers Start, even during backoff.
+fn tray_should_stop(stage: &str, process_running: bool) -> bool {
+    process_running || stage == "starting"
+}
 fn unix_now() -> u64 { SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() }
 
 #[derive(Clone, Serialize)]
@@ -87,7 +93,14 @@ impl Controller {
     }
     pub fn settings(&self) -> Settings { self.inner.lock().unwrap().settings.clone() }
     pub fn snapshot(&self) -> Snapshot { self.inner.lock().unwrap().snapshot() }
-    fn publish(&self, app: &AppHandle) { let _ = app.emit("receiver://snapshot", self.snapshot()); }
+    pub(crate) fn tray_should_stop(&self) -> bool {
+        let inner = self.inner.lock().unwrap();
+        tray_should_stop(inner.stage, inner.child.is_some())
+    }
+    fn publish(&self, app: &AppHandle) {
+        crate::sync_tray_receiver_item(app);
+        let _ = app.emit("receiver://snapshot", self.snapshot());
+    }
     fn error(&self, app: &AppHandle, epoch: u64, issue: &'static str, message: &str) {
         { let mut inner = self.inner.lock().unwrap(); if inner.epoch != epoch || inner.stopping { return; } inner.stage="error"; inner.detail=message.to_owned(); inner.issue=Some(issue); inner.log(issue); }
         self.publish(app);
@@ -327,7 +340,7 @@ fn spawn_log_reader<R: Read + Send + 'static>(
 
 #[cfg(test)]
 mod stream_tests {
-    use super::{consume_lines, start_already_in_progress};
+    use super::{consume_lines, start_already_in_progress, tray_should_stop};
     use std::io::{Cursor, Read};
 
     fn events_from<R: Read>(stream: R) -> Vec<String> {
@@ -343,6 +356,18 @@ mod stream_tests {
         assert!(start_already_in_progress(true, true, "stopped"));
         assert!(!start_already_in_progress(false, false, "error"));
         assert!(!start_already_in_progress(false, true, "stopped"));
+    }
+
+    #[test]
+    fn tray_receiver_action_covers_all_lifecycle_states() {
+        assert!(!tray_should_stop("stopped", false));
+        assert!(tray_should_stop("starting", false));
+        assert!(tray_should_stop("waiting", true));
+        assert!(tray_should_stop("connecting", true));
+        assert!(tray_should_stop("connected", true));
+        assert!(tray_should_stop("error", true));
+        assert!(!tray_should_stop("error", false));
+        assert!(!tray_should_stop("waiting", false));
     }
 
     #[test]
