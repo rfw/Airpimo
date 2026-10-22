@@ -1,4 +1,5 @@
 mod diagnostic;
+mod power_inhibit;
 mod receiver;
 mod settings;
 mod uxplay_args;

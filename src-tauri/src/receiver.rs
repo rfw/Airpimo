@@ -1,4 +1,4 @@
-use crate::{diagnostic::{self, Observation}, settings::{self, Settings}};
+use crate::{diagnostic::{self, Observation}, power_inhibit::PowerInhibitor, settings::{self, Settings}};
 use serde::Serialize;
 use std::{collections::VecDeque, io::{BufRead, BufReader, Read}, path::{Path, PathBuf}, process::{Child, Command, Stdio}, sync::{Arc, Mutex}, thread, time::{Duration, Instant, SystemTime, UNIX_EPOCH}};
 use tauri::{AppHandle, Emitter, Manager};
@@ -23,6 +23,11 @@ fn start_already_in_progress(child_present: bool, stopping: bool, stage: &str) -
 // A failed/exited engine with no child offers Start, even during backoff.
 fn tray_should_stop(stage: &str, process_running: bool) -> bool {
     process_running || stage == "starting"
+}
+// A spawned receiver or a successful TCP connection alone is NOT mirroring.
+// Only the actual mirror-start event may acquire a display wake assertion.
+fn should_keep_display_awake(stage: &str, process_running: bool, stopping: bool) -> bool {
+    stage == "connected" && process_running && !stopping
 }
 fn unix_now() -> u64 { SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() }
 
@@ -60,6 +65,7 @@ struct Inner {
     started_at: Option<Instant>,
     connecting_at: Option<Instant>,
     logs: VecDeque<String>,
+    power_inhibitor: Option<PowerInhibitor>,
 }
 impl Inner {
     fn snapshot(&self) -> Snapshot {
@@ -78,6 +84,21 @@ impl Inner {
         if self.logs.len() >= LOG_LIMIT { self.logs.pop_front(); }
         self.logs.push_back(format!("{} | {}", unix_now(), key));
     }
+    fn sync_display_awake(&mut self) {
+        if !should_keep_display_awake(self.stage, self.child.is_some(), self.stopping) {
+            // Drop releases both Windows power requests or the macOS IOKit assertion.
+            self.power_inhibitor = None;
+        } else if self.power_inhibitor.is_none() {
+            match PowerInhibitor::acquire() {
+                Ok(guard) => { self.power_inhibitor = Some(guard); self.log("display_awake_acquired"); }
+                Err(err) => {
+                    // Mirroring must remain available even if OS power management fails.
+                    self.log("display_awake_acquire_failed");
+                    eprintln!("Airpimo could not inhibit idle display sleep: {err}");
+                }
+            }
+        }
+    }
 }
 pub struct Controller { inner: Mutex<Inner>, settings_path: PathBuf }
 impl Controller {
@@ -88,7 +109,7 @@ impl Controller {
         Arc::new(Self { inner: Mutex::new(Inner {
             settings, stage:"stopped", detail:"接收服务已停止".into(), issue:None, child:None,
             epoch:0, stopping:true, restart_attempts:0, applied_device_name:None, applied_fps:None, applied_brightness:None, applied_uxplay_args:None,
-            connected_since:None, started_at:None, connecting_at:None, logs,
+            connected_since:None, started_at:None, connecting_at:None, logs, power_inhibitor:None,
         }), settings_path })
     }
     pub fn settings(&self) -> Settings { self.inner.lock().unwrap().settings.clone() }
@@ -98,6 +119,10 @@ impl Controller {
         tray_should_stop(inner.stage, inner.child.is_some())
     }
     fn publish(&self, app: &AppHandle) {
+        // Reconcile the OS power assertion before publishing every lifecycle
+        // change; this also covers manual stop, disconnect, errors, restart and
+        // unexpected child exit without frontend involvement or polling.
+        self.inner.lock().unwrap().sync_display_awake();
         crate::sync_tray_receiver_item(app);
         let _ = app.emit("receiver://snapshot", self.snapshot());
     }
@@ -130,7 +155,7 @@ impl Controller {
             let mut i=self.inner.lock().unwrap();
             i.stopping=true; i.epoch+=1; i.stage="stopped"; i.detail="接收服务已停止".into();
             i.issue=None; i.connected_since=None; i.connecting_at=None; i.applied_device_name=None; i.applied_fps=None; i.applied_brightness=None; i.applied_uxplay_args=None; i.restart_attempts=0;
-            i.log("stopped_by_user"); i.child.take()
+            i.log("stopped_by_user"); i.power_inhibitor = None; i.child.take()
         };
         if let Some(mut child) = child { let _ = child.kill(); let _ = child.wait(); }
         self.publish(app);
@@ -286,7 +311,7 @@ impl Controller {
         let retry_delay = {
             let mut i=self.inner.lock().unwrap();
             if i.epoch!=epoch || i.stopping {return;}
-            i.child.take(); i.connected_since=None; i.connecting_at=None; i.applied_device_name=None; i.applied_fps=None; i.applied_brightness=None; i.applied_uxplay_args=None;
+            i.power_inhibitor = None; i.child.take(); i.connected_since=None; i.connecting_at=None; i.applied_device_name=None; i.applied_fps=None; i.applied_brightness=None; i.applied_uxplay_args=None;
             if i.started_at.map(|t| t.elapsed() > Duration::from_secs(60)).unwrap_or(false) { i.restart_attempts=0; }
             i.restart_attempts=i.restart_attempts.saturating_add(1);
             i.stage="error";
@@ -340,7 +365,7 @@ fn spawn_log_reader<R: Read + Send + 'static>(
 
 #[cfg(test)]
 mod stream_tests {
-    use super::{consume_lines, start_already_in_progress, tray_should_stop};
+    use super::{consume_lines, should_keep_display_awake, start_already_in_progress, tray_should_stop};
     use std::io::{Cursor, Read};
 
     fn events_from<R: Read>(stream: R) -> Vec<String> {
@@ -368,6 +393,16 @@ mod stream_tests {
         assert!(tray_should_stop("error", true));
         assert!(!tray_should_stop("error", false));
         assert!(!tray_should_stop("waiting", false));
+    }
+
+    #[test]
+    fn display_awake_requires_real_mirroring_and_live_child() {
+        for stage in ["stopped", "starting", "waiting", "connecting", "error"] {
+            assert!(!should_keep_display_awake(stage, true, false));
+        }
+        assert!(!should_keep_display_awake("connected", false, false));
+        assert!(!should_keep_display_awake("connected", true, true));
+        assert!(should_keep_display_awake("connected", true, false));
     }
 
     #[test]
