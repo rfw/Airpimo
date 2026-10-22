@@ -1,0 +1,14 @@
+/* Static first paint, visible before the React bundle and its theme CSS finish loading. */
+html, body { margin: 0; min-height: 100%; }
+#airpimo-startup {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; background: #fff; color: #475569;
+  font: 13px/1.45 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+#airpimo-startup strong { font-size: 19px; font-weight: 650; letter-spacing: .02em; color: #253349; }
+#airpimo-startup .airpimo-loading-wheel { width: 23px; height: 23px; border-radius: 50%; border: 2px solid rgba(58,130,220,.15); border-top-color: #4185db; animation: airpimo-wheel .85s linear infinite; }
+html.dark #airpimo-startup { background: #1b1e23; color: #aeb8c6; }
+html.dark #airpimo-startup strong { color: #d9dee6; }
+@keyframes airpimo-wheel { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { #airpimo-startup .airpimo-loading-wheel { animation: none; } }

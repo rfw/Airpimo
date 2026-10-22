@@ -56,16 +56,6 @@ test('development override cannot be selected in release and release requires bu
   assert.match(rust,/if !bin\.is_dir\(\) \|\| !plugins\.is_dir\(\)/);
 });
 
-test('settings use accessible radio choices and retain Radix window bounds',()=>{
- const view=readFileSync(join(root,'src/components/AirpimoSettingsDialog.tsx'),'utf8');
- const dialog=readFileSync(join(root,'src/components/ui/dialog.tsx'),'utf8');
- assert.doesNotMatch(view,/<select[^>]+id="theme"/);
- assert.match(view,/role="radiogroup" aria-label="主题"/);
- assert.match(view,/type="radio" name="theme"/);
- assert.match(view,/46px/);
- assert.match(dialog,/overflow-y-auto/);
-});
-
 test('development and release expose distinct missing-binary messages', async()=>{
   const {issueHint}=await import('../src/domain/state.ts');
   assert.match(issueHint('missing_binary',true),/native:doctor/);

@@ -1,5 +1,19 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><script src="/theme-bootstrap.js"></script><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><meta name="theme-color" content="#1b1e23"/><title>Airpimo</title></head>
-<body><div id="airpimo-startup" class="fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-2.5 bg-white font-sans text-[13px] leading-[1.45] text-slate-600 dark:bg-[#1b1e23] dark:text-[#aeb8c6]" role="status" aria-live="polite"><span class="size-[23px] animate-spin rounded-full border-2 border-[#3a82dc]/15 border-t-[#4185db] motion-reduce:animate-none" aria-hidden="true"></span><strong class="text-[19px] font-[650] tracking-[0.02em] text-[#253349] dark:text-[#d9dee6]">Airpimo</strong><span>启动中…</span></div><div id="root"></div><script type="module" src="/src/main.tsx"></script></body>
+<head>
+    <script src="/theme-bootstrap.js"></script>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <meta name="theme-color" content="#1b1e23"/>
+    <link rel="stylesheet" href="/startup.css"/>
+    <title>Airpimo</title></head>
+<body>
+<div id="airpimo-startup" role="status" aria-live="polite">
+    <span class="airpimo-loading-wheel" aria-hidden="true"></span>
+    <strong>Airpimo</strong>
+    <span>启动中…</span>
+</div>
+<div id="root"></div>
+<script type="module" src="/src/main.tsx"></script>
+</body>
 </html>
