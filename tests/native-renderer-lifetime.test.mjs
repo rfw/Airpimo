@@ -52,7 +52,11 @@ test('source transform fails closed on unknown, duplicate, or already-patched Ux
 });
 
 test('source patch is identified by content digest and older valid binary receipts are invalidated',()=>{
-  const actual=createHash('sha256').update(readFileSync(new URL('../native/patches/renderer-lifetime.mjs',import.meta.url))).digest('hex');
+  const actual=createHash('sha256')
+    .update(readFileSync(new URL('../native/patches/renderer-lifetime.mjs',import.meta.url)))
+    .update('\0')
+    .update(readFileSync(new URL('../native/patches/audio-empty-packets.mjs',import.meta.url)))
+    .digest('hex');
   assert.equal(RENDERER_PATCH_SHA256,actual);
   const dir=mkdtempSync(join(tmpdir(),'airpimo-renderer-patch-'));
   try {

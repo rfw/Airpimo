@@ -72,8 +72,8 @@ test('missing MSYS2 toolchain is explained before first Windows build',()=>sandb
 test('macOS app keeps verified software decoder and release ignores debug override',()=>{
  const fs=readFileSync(new URL('../src-tauri/src/receiver.rs',import.meta.url),'utf8');
  const args = readFileSync(new URL('../src-tauri/src/uxplay_args.rs',import.meta.url),'utf8');
-  assert.match(args,/cfg\(target_os = "macos"\)/);
-  assert.match(args,/push_default\(&mut args, &custom, "-vsync", Some\("no"\)\)/);
+  assert.match(args,/cfg\(any\(windows, target_os = "macos"\)\)/);
+  assert.doesNotMatch(args,/push_default\(&mut args, &custom, "-vsync", Some\("no"\)\)/);
  assert.match(fs,/#\[cfg\(debug_assertions\)\]\s*if let Some\(override_path\)/);
  assert.match(fs,/GST_PLUGIN_SYSTEM_PATH_1_0/);
 });
@@ -92,7 +92,7 @@ test('FPS and 50% initial volume flow into UxPlay; Windows has software decoder 
 test('brightness is backed by real UxPlay -vc videobalance and retains Windows A/V sync',()=>{
   const receiver=readFileSync(new URL('../src-tauri/src/receiver.rs', import.meta.url),'utf8');
   const settings=readFileSync(new URL('../src-tauri/src/settings.rs', import.meta.url),'utf8');
-  const app=readFileSync(new URL('../src/components/AirpimoSettingsDialog.tsx', import.meta.url),'utf8');
+  const app=readFileSync(new URL('../src/App.tsx', import.meta.url),'utf8');
   const args = readFileSync(new URL('../src-tauri/src/uxplay_args.rs', import.meta.url),'utf8');
   assert.match(args,/if brightness < 100/);
   assert.match(args,/videoconvert ! videobalance brightness=/);
@@ -102,5 +102,7 @@ test('brightness is backed by real UxPlay -vc videobalance and retains Windows A
   assert.match(receiver,/let effective_args = match crate::uxplay_args::effective\(&name, fps, brightness, &user_args\)/);
   assert.match(receiver,/command\.args\(&effective_args\)/);
   assert.match(settings,/serde\(default = "default_brightness"\)/);
+  assert.match(settings,/pub const fn default_brightness\(\) -> u8 \{ 100 \}/);
+  assert.match(app,/aria-label="画面亮度" type="range"/);
   assert.doesNotMatch(receiver,/"-vsync", "no"\]\);\s*\/\/.*windows/);
 });
