@@ -132,6 +132,9 @@ static void airpimo_watermark_attach(GstElement *pipeline) {
 
 export function patchResponsiveWatermarkSource(source, {variant = 'pinned'} = {}) {
   if (!['pinned', 'internal-mdns'].includes(variant)) throw Error('Unsupported renderer patch variant');
+  if (source.includes('static void airpimo_watermark_attach(') || source.includes('airpimo_watermark_apply_caps(')) {
+    throw Error('UxPlay watermark patch rejected: already modified or conflicting adaptive watermark helper');
+  }
   if (variant === 'pinned' && !source.includes('static GMutex airpimo_renderer_mutex;')) {
     throw Error('UxPlay watermark patch rejected: renderer-lifetime patch missing');
   }
@@ -142,23 +145,49 @@ export function patchResponsiveWatermarkSource(source, {variant = 'pinned'} = {}
     'void video_renderer_init(logger_t *render_logger, const char *server_name,',
     nativeFunctions + 'void video_renderer_init(logger_t *render_logger, const char *server_name,',
     'native helper insertion');
-  const activation = variant === 'pinned' ?
-    `    g_mutex_lock(&airpimo_renderer_mutex);
+  if (variant === 'pinned') {
+    // Preserve the existing byte-for-byte contract for the lifetime-patched
+    // macOS UxPlay 1.73.7 source. Do not accidentally change its sync path.
+    const activation = `    g_mutex_lock(&airpimo_renderer_mutex);
     renderer = renderer_used;
     g_mutex_unlock(&airpimo_renderer_mutex);
-    gst_element_set_state (renderer->pipeline, GST_STATE_PLAYING);` :
-    `    renderer = renderer_used;
     gst_element_set_state (renderer->pipeline, GST_STATE_PLAYING);`;
-  if (variant === 'internal-mdns' && !source.includes('renderer = renderer_used;')) {
-    throw Error('UxPlay watermark patch rejected: internal-mDNS pipeline activation not found');
-  }
-  const replacement = activation.replace(
-    '    gst_element_set_state (renderer->pipeline, GST_STATE_PLAYING);',
-    `#if defined(__APPLE__) || defined(_WIN32)
+    const replacement = activation.replace(
+      '    gst_element_set_state (renderer->pipeline, GST_STATE_PLAYING);',
+      `#if defined(__APPLE__) || defined(_WIN32)
     airpimo_watermark_attach(renderer_used->pipeline);
 #endif
     gst_element_set_state (renderer->pipeline, GST_STATE_PLAYING);`);
-  next = replaceExactlyOnce(next, activation, replacement, 'active video pipeline activation');
+    next = replaceExactlyOnce(next, activation, replacement, 'active video pipeline activation');
+  } else {
+    // Internal-mDNS UxPlay 1.74 has a different pipeline start sequence from
+    // the pinned 1.73.7/macOS renderer. The previous patch required an *exact*
+    // adjacent pair of statement strings and failed in Windows Actions before
+    // compilation. Instead, attach at the unique point where the active video
+    // renderer is published, before subsequent frames may be delivered.
+    //
+    // Check the renderer contract and uniqueness; never attach at every
+    // gst_element_set_state() (which also occurs during teardown/reconfigure).
+    if (!/\bgst_element_set_state\s*\(/.test(source) ||
+        !/\bGST_STATE_PLAYING\b/.test(source) ||
+        !/\b(?:renderer_used|renderer)\s*->\s*pipeline\b/.test(source)) {
+      throw Error('UxPlay watermark patch rejected: internal-mDNS renderer/pipeline state contract changed');
+    }
+    const publish = /^[ \t]*renderer\s*=\s*renderer_used\s*;[ \t]*(?:\/\/[^\r\n]*)?(?:\r?\n|$)/gm;
+    const sites = [...next.matchAll(publish)];
+    if (sites.length !== 1) {
+      throw Error(`UxPlay watermark patch rejected: internal-mDNS active renderer publication must be unique (found ${sites.length})`);
+    }
+    const site = sites[0];
+    const pos = site.index + site[0].length;
+    const indentation = site[0].match(/^[ \t]*/)[0];
+    // A compound statement is intentional: if upstream uses a single-line
+    // 'if (condition)\n  renderer = renderer_used;', both operations must
+    // remain under that condition, not just the pointer assignment.
+    const statement = site[0].trimEnd().trimStart();
+    const replacement = `${indentation}{\n${indentation}    ${statement}\n#if defined(__APPLE__) || defined(_WIN32)\n${indentation}    airpimo_watermark_attach(renderer_used->pipeline);\n#endif\n${indentation}}\n`;
+    next = next.slice(0, site.index) + replacement + next.slice(pos);
+  }
   return next;
 }
 

@@ -56,7 +56,7 @@ test('video caps changes automatically update only the named cross-platform wate
 test('native transform rejects unrecognized or already modified renderer',()=>{
   assert.throws(()=>patchResponsiveWatermarkSource(upstream),/renderer-lifetime patch missing/);
   assert.throws(()=>patchResponsiveWatermarkSource(source.replace('renderer = renderer_used;', 'renderer = something_else;')),/anchor absent/);
-  assert.throws(()=>patchResponsiveWatermarkSource(patchResponsiveWatermarkSource(source)),/anchor absent/);
+  assert.throws(()=>patchResponsiveWatermarkSource(patchResponsiveWatermarkSource(source)),/already modified/);
 });
 
 test('written patch is deterministic and does not alter input if mismatch',()=>{
@@ -66,7 +66,7 @@ test('written patch is deterministic and does not alter input if mismatch',()=>{
     writeFileSync(p,source);
     applyResponsiveWatermarkPatch(p);
     assert.equal(readFileSync(p,'utf8'),patchResponsiveWatermarkSource(source));
-    assert.throws(()=>applyResponsiveWatermarkPatch(p),/anchor absent/);
+    assert.throws(()=>applyResponsiveWatermarkPatch(p),/already modified/);
   } finally { rmSync(dir,{recursive:true,force:true}); }
 });
 
