@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdirSync,mkdtempSync,readFileSync,writeFileSync,statSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
-import {ensureMacTitleHelper,needsMacTitleBuild,prepareDevResourceDirectories,macTarget} from '../scripts/dev-macos-title.mjs';
+import {ensureMacTitleHelper,needsMacTitleBuild,prepareDevResourceDirectories,macTarget,syncDevMacTitleHelper} from '../scripts/dev-macos-title.mjs';
 import {verifiedCachedEngine,storeEngine,LOCK} from '../scripts/native-engine-core.mjs';
 const root = resolve(import.meta.dirname,'..');
 const read = name => readFileSync(join(root,name),'utf8');
@@ -41,6 +41,9 @@ test('Mac helper builds only on Mac, if missing or older than Objective-C source
    called++;
    assert.equal(cmd,'bash');assert.deepEqual(args,['scripts/ci/build-macos-fullscreen.sh','x86_64-apple-darwin']);
    assert.equal(opts.cwd,dir);
+   const output=join(dir,'src-tauri/resources/fullscreen/uxplay-fullscreen-macos.dylib');
+   mkdirSync(resolve(output,'..'),{recursive:true});
+   writeFileSync(output,'compiled');
    return {status:0};
  };
  assert.equal(ensureMacTitleHelper(dir,{platform:'darwin',arch:'x64',run}),true);
@@ -48,9 +51,16 @@ test('Mac helper builds only on Mac, if missing or older than Objective-C source
  const output=join(dir,'src-tauri/resources/fullscreen/uxplay-fullscreen-macos.dylib');
  writeFileSync(output,'helper');
  assert.equal(needsMacTitleBuild(dir),false);
+ const runtime=join(dir,'src-tauri/target/debug/fullscreen/uxplay-fullscreen-macos.dylib');
+ assert.equal(readFileSync(runtime,'utf8'),'compiled');
  assert.equal(ensureMacTitleHelper(dir,{platform:'darwin',arch:'x64',run}),false);
  assert.equal(called,1);
  assert.equal(ensureMacTitleHelper(dir,{platform:'win32',arch:'x64',run}),false);
+ // A stale runtime copy must be synchronized even when no rebuild is due.
+ writeFileSync(runtime,'stale');
+ assert.equal(syncDevMacTitleHelper(dir),true);
+ assert.equal(readFileSync(runtime,'utf8'),'helper');
+ assert.equal(syncDevMacTitleHelper(dir),false);
 }));
 
 test('fresh checkout can start debug Tauri without claiming a distributable runtime',()=>fixture(dir=>{

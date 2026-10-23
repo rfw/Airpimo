@@ -163,6 +163,19 @@ static OSStatus airpimoRequestUIElement(void) {
     for (NSWindow *window in NSApp.windows) {
         if (!window.visible || !airpimoIsVideoWindow(window)) continue;
         if (![window.title isEqualToString:@"Airpimo Player"]) window.title = @"Airpimo Player";
+
+        // An Accessory (Dock-less) application does not always opt its windows
+        // into native macOS fullscreen. Without FullScreenPrimary the green
+        // traffic-light falls back to Zoom, leaving the Dock/menu bar visible.
+        // Keep the system button and its native transition; do not swizzle
+        // the Zoom selector, replace the button, or resize the GStreamer GL surface here.
+        NSWindowCollectionBehavior current = window.collectionBehavior;
+        NSWindowCollectionBehavior desired =
+            (current & ~(NSWindowCollectionBehaviorFullScreenAuxiliary |
+                         NSWindowCollectionBehaviorFullScreenNone |
+                         NSWindowCollectionBehaviorCanJoinAllSpaces)) |
+            NSWindowCollectionBehaviorFullScreenPrimary;
+        if (desired != current) window.collectionBehavior = desired;
     }
 }
 - (void)start {

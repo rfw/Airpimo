@@ -2,10 +2,13 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const load = (name) => readFileSync(new URL(`../${name}`, import.meta.url), 'utf8');
-test('macOS player helper only sets window title; system fullscreen is untouched', () => {
+test('macOS player helper retains system green-button fullscreen in Accessory mode', () => {
   const native = load('native/fullscreen/uxplay-fullscreen-macos.m');
   assert.match(native, /window\.title = @"Airpimo Player"/);
-  assert.doesNotMatch(native, /addSubview:|NSEventMaskLeftMouseDown|clickCount|toggleWindow:|toggleFromButton/);
+  assert.match(native, /NSWindowCollectionBehaviorFullScreenPrimary/);
+  assert.match(native, /NSWindowCollectionBehaviorFullScreenNone/);
+  assert.match(native, /window\.collectionBehavior = desired/);
+  assert.doesNotMatch(native, /toggleFullScreen:|zoom:|addSubview:|NSEventMaskLeftMouseDown|clickCount|toggleWindow:|toggleFromButton/);
   assert.match(native, /AIRPIMO_PLAYER_TITLE_CHILD/);
 });
 test('helper is injected only into macOS child and built for both macOS architectures', () => {
