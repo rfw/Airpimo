@@ -18,7 +18,7 @@ OUT="$OUT_DIR/uxplay-fullscreen-macos.dylib"
 # libraries still need their independent compatibility audit.
 clang -fobjc-arc -fblocks -dynamiclib -O2 \
   -arch "$ARCH" -mmacosx-version-min=13.0 \
-  -framework Cocoa "$SOURCE" -o "$OUT"
+  -framework Cocoa -framework ApplicationServices "$SOURCE" -o "$OUT"
 file "$OUT"
 lipo -archs "$OUT" | grep -qx "$ARCH" || { echo 'BLOCKED: incorrect helper architecture' >&2; exit 2; }
 if command -v vtool >/dev/null; then

@@ -1,9 +1,10 @@
-// Airpimo Player: macOS player-window title, safe-close, and accessory-app guard.
-// Injected only into the Airpimo-managed UxPlay child process (never Tauri).
-// UxPlay/GStreamer owns the NSApplication and video window lifetime.
+// Airpimo Player macOS helper, loaded only in the managed UxPlay child.
+// This changes process presentation, never the parent Tauri application.
 #import <Cocoa/Cocoa.h>
+#import <ApplicationServices/ApplicationServices.h>
 #import <dispatch/dispatch.h>
 #import <objc/runtime.h>
+#import <stdio.h>
 #import <unistd.h>
 
 static BOOL airpimoIsVideoWindow(NSWindow *window) {
@@ -20,13 +21,14 @@ static BOOL airpimoIsVideoWindow(NSWindow *window) {
 @implementation NSWindow (AirpimoPlayerClose)
 - (void)airpimo_playerPerformClose:(id)sender {
     if (airpimoIsVideoWindow(self)) {
-        // Keep the live GL surface intact; closing it while RAOP renders can crash.
+        // GStreamer still owns the GL surface. Destroying it during rendering
+        // can crash UxPlay; let the parent receiver stop the child instead.
         [self orderOut:nil];
         static const char note[] = "AIRPIMO_PLAYER_WINDOW_HIDDEN\n";
         (void)write(STDOUT_FILENO, note, sizeof(note) - 1);
         return;
     }
-    [self airpimo_playerPerformClose:sender]; // Swizzled original.
+    [self airpimo_playerPerformClose:sender];
 }
 @end
 
@@ -36,29 +38,23 @@ static void airpimoInstallSafeClose(void) {
     if (original && guarded) method_exchangeImplementations(original, guarded);
 }
 
-// GStreamer-GL's Cocoa window creation calls
-//   [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular]
-// each time it creates its own window. Setting Accessory only on a periodic
-// timer allows that call to re-register UxPlay in Dock and the application
-// menu. Prevent this *in the child process* before Cocoa initializes.
-// Unlike Prohibited, Accessory still allows visible, interactive NSWindows.
+// gstglwindow_cocoa.m explicitly requests Regular when creating its window.
+// Prevent this promotion before the video window is created. Accessory is
+// intentional: Prohibited would break window activation and input.
 @interface NSApplication (AirpimoChildActivation)
 - (BOOL)airpimo_childSetActivationPolicy:(NSApplicationActivationPolicy)policy;
 @end
 @implementation NSApplication (AirpimoChildActivation)
 - (BOOL)airpimo_childSetActivationPolicy:(NSApplicationActivationPolicy)policy {
     if (policy == NSApplicationActivationPolicyRegular) {
-        static dispatch_once_t noticeOnce;
-        dispatch_once(&noticeOnce, ^{
+        static dispatch_once_t once;
+        dispatch_once(&once, ^{
             static const char note[] = "AIRPIMO_DOCK_REGULAR_BLOCKED\n";
             (void)write(STDERR_FILENO, note, sizeof(note) - 1);
         });
-        // A caller that wants Regular just needs a window; Accessory supports
-        // this without a Dock entry or a child-process menu bar.
         if ([self activationPolicy] == NSApplicationActivationPolicyAccessory) return YES;
         policy = NSApplicationActivationPolicyAccessory;
     }
-    // After swizzling this invokes the original AppKit implementation.
     return [self airpimo_childSetActivationPolicy:policy];
 }
 @end
@@ -76,30 +72,94 @@ static void airpimoInstallDockGuard(void) {
     }
 }
 
+// NSApplication's policy getter is not necessarily the Launch Services process
+// registration state. Query NSRunningApplication independently and, in addition
+// to AppKit, use Apple's Process Manager UIElement transition as a bounded
+// fallback. Never transform the process to Prohibited or Foreground.
+static OSStatus airpimoRequestUIElement(void) {
+    ProcessSerialNumber psn = {0, kCurrentProcess};
+    return TransformProcessType(&psn, kProcessTransformToUIElementApplication);
+}
+
 @interface AirpimoVideoTitle : NSObject
 @property(nonatomic, strong) dispatch_source_t timer;
-@property(nonatomic, assign) BOOL dockPolicyApplied;
-@property(nonatomic, assign) BOOL dockPolicyFailureReported;
+@property(nonatomic, assign) NSUInteger transformAttempts;
+@property(nonatomic, assign) NSUInteger ticks;
+@property(nonatomic, assign) NSInteger lastAppKitPolicy;
+@property(nonatomic, assign) NSInteger lastRunningPolicy;
+@property(nonatomic, assign) BOOL hasLoggedState;
+@property(nonatomic, assign) BOOL hasLoggedAccessory;
+@property(nonatomic, assign) BOOL hasLoggedFailure;
 @end
 @implementation AirpimoVideoTitle
 - (void)refreshVideoTitle {
-    // This is the AppKit main queue. Never create NSApplication manually;
-    // gst_macos_main owns its initialization and event loop.
+    // All AppKit and Process Manager calls happen on the main queue.
     if (!NSApp) return;
+    self.ticks++;
+
+    // Process/menu naming is a fallback only; hiding the Dock and app menu is
+    // still the priority. This prevents a remaining menu from saying "uxplay".
+    if (![[[NSProcessInfo processInfo] processName] isEqualToString:@"Airpimo Player"]) {
+        [[NSProcessInfo processInfo] setProcessName:@"Airpimo Player"];
+    }
+
     if ([NSApp activationPolicy] != NSApplicationActivationPolicyAccessory) {
-        BOOL changed = [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
-        BOOL active = changed && ([NSApp activationPolicy] == NSApplicationActivationPolicyAccessory);
-        if (active && !self.dockPolicyApplied) {
+        (void)[NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+    }
+
+    NSRunningApplication *running = [NSRunningApplication currentApplication];
+    NSApplicationActivationPolicy appPolicy = [NSApp activationPolicy];
+    NSApplicationActivationPolicy runningPolicy = running.activationPolicy;
+
+    // One early OS-level registration attempt, plus at most two retries if
+    // Launch Services still sees a foreground application. Retry no faster
+    // than once per second; never re-register continuously every 500ms.
+    if (self.transformAttempts < 3 &&
+        (self.transformAttempts == 0 ||
+         (runningPolicy == NSApplicationActivationPolicyRegular && self.ticks % 2 == 0))) {
+        self.transformAttempts++;
+        OSStatus status = airpimoRequestUIElement();
+        char note[128];
+        int size = snprintf(note, sizeof(note), "AIRPIMO_DOCK_TRANSFORM status=%ld attempt=%lu\n",
+                            (long)status, (unsigned long)self.transformAttempts);
+        if (size > 0 && size < (int)sizeof(note)) (void)write(STDERR_FILENO, note, (size_t)size);
+    }
+
+    appPolicy = [NSApp activationPolicy];
+    runningPolicy = [running activationPolicy];
+    if (!self.hasLoggedState || appPolicy != self.lastAppKitPolicy ||
+        runningPolicy != self.lastRunningPolicy) {
+        self.hasLoggedState = YES;
+        self.lastAppKitPolicy = appPolicy;
+        self.lastRunningPolicy = runningPolicy;
+        char note[128];
+        int size = snprintf(note, sizeof(note), "AIRPIMO_DOCK_STATE appkit=%ld running=%ld\n",
+                            (long)appPolicy, (long)runningPolicy);
+        if (size > 0 && size < (int)sizeof(note)) (void)write(STDERR_FILENO, note, (size_t)size);
+    }
+
+    if (appPolicy == NSApplicationActivationPolicyAccessory &&
+        runningPolicy == NSApplicationActivationPolicyAccessory) {
+        if (!self.hasLoggedAccessory) {
             static const char note[] = "AIRPIMO_DOCK_ACCESSORY_ACTIVE\n";
             (void)write(STDERR_FILENO, note, sizeof(note) - 1);
+            self.hasLoggedAccessory = YES;
         }
-        if (!active && !self.dockPolicyFailureReported) {
-            static const char note[] = "AIRPIMO_DOCK_ACCESSORY_FAILED\n";
-            (void)write(STDERR_FILENO, note, sizeof(note) - 1);
-            self.dockPolicyFailureReported = YES;
-        }
-        self.dockPolicyApplied = active;
+    } else if (self.transformAttempts >= 3 && !self.hasLoggedFailure) {
+        static const char note[] = "AIRPIMO_DOCK_ACCESSORY_FAILED\n";
+        (void)write(STDERR_FILENO, note, sizeof(note) - 1);
+        self.hasLoggedFailure = YES;
     }
+
+    // If macOS keeps UxPlay registered as a regular app, at least stop the
+    // application menu caption from exposing the internal engine name.
+    if (runningPolicy == NSApplicationActivationPolicyRegular && NSApp.mainMenu.numberOfItems > 0) {
+        NSMenuItem *applicationItem = [NSApp.mainMenu itemAtIndex:0];
+        if (![applicationItem.title isEqualToString:@"Airpimo Player"]) {
+            applicationItem.title = @"Airpimo Player";
+        }
+    }
+
     for (NSWindow *window in NSApp.windows) {
         if (!window.visible || !airpimoIsVideoWindow(window)) continue;
         if (![window.title isEqualToString:@"Airpimo Player"]) window.title = @"Airpimo Player";
@@ -116,8 +176,7 @@ static void airpimoInstallDockGuard(void) {
 
 __attribute__((constructor)) static void airpimoVideoTitleInit(void) {
     if (!getenv("AIRPIMO_PLAYER_TITLE_CHILD")) return;
-    // Swizzle before GStreamer's Cocoa window creation, not after the first
-    // frame or after the first attempt to promote UxPlay into Dock.
+    // The selector guard must exist before GStreamer initializes Cocoa.
     airpimoInstallSafeClose();
     airpimoInstallDockGuard();
     dispatch_async(dispatch_get_main_queue(), ^{
