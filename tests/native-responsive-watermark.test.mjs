@@ -45,7 +45,8 @@ test('video caps changes automatically update only the named cross-platform wate
   assert.match(c, /gst_element_get_static_pad\(overlay, "video_sink"\)/);
   assert.match(c, /gst_bin_get_by_name\(GST_BIN\(pipeline\), "airpimo_watermark"\)/);
   assert.match(c, /width \* par_n < \(gint64\)height \* par_d/);
-  assert.match(c, /portrait \? 24\.0 : 14\.0/);
+  assert.match(c, /portrait \? 16\.0 : 14\.0/);
+  assert.match(c, /portrait \? 12\.0 : 12\.0/);
   assert.match(c, /g_object_set\(overlay, "font-desc", font_desc, "xpad", margin/);
   assert.match(c, /g_weak_ref_get\(&state->overlay\)/);
   assert.match(c, /g_weak_ref_clear\(&state->overlay\)/);
@@ -73,7 +74,7 @@ test('written patch is deterministic and does not alter input if mismatch',()=>{
 test('macOS and Windows both get named watermark, with no -vsync no default',()=>{
   const rust=readFileSync(new URL('../src-tauri/src/uxplay_args.rs',import.meta.url),'utf8');
   assert.match(rust, /#\[cfg\(any\(windows, target_os = "macos"\)\)\]\s*converter\.push_str\(" name=airpimo_watermark auto-resize=false"\)/);
-  assert.match(rust, /xpad=16 ypad=16 font-desc=\\"Sans 14\\"/);
+  assert.match(rust, /xpad=12 ypad=12 font-desc=\\"Sans 14\\"/);
   assert.doesNotMatch(rust, /push_default\(&mut args, &custom, "-vsync", Some\("no"\)\)/);
 });
 

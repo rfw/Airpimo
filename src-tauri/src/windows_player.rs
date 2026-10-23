@@ -3,7 +3,7 @@
 //! Operates only on visible top-level windows owned by this exact child PID.
 #![cfg(windows)]
 use std::{mem::size_of, os::windows::ffi::OsStrExt, thread, time::{Duration, Instant}};
-use std::ffi::OsStr;
+use std::ffi::{OsStr, c_void};
 
 type Hwnd = isize;
 type Handle = isize;
@@ -48,11 +48,9 @@ extern "system" {
 }
 
 const GWL_STYLE: i32 = -16;
-const GWL_EXSTYLE: i32 = -20;
-const WS_EX_APPWINDOW: isize = 0x0004_0000;
-const WS_EX_TOOLWINDOW: isize = 0x0000_0080;
-const SW_HIDE: i32 = 0;
-const SW_SHOWNA: i32 = 8;
+const WS_CAPTION: isize = 0x00c0_0000;
+const WS_SYSMENU: isize = 0x0008_0000;
+
 const WS_MAXIMIZEBOX: isize = 0x0001_0000;
 const WS_THICKFRAME: isize = 0x0004_0000;
 const WS_OVERLAPPEDWINDOW: isize = 0x00cf_0000;
@@ -94,28 +92,74 @@ fn set_title_and_maximize_button(hwnd: Hwnd) {
     unsafe {
         SetWindowTextW(hwnd, title.as_ptr());
         let style = GetWindowLongPtrW(hwnd, GWL_STYLE);
-        if (style & WS_MAXIMIZEBOX) == 0 {
-            SetWindowLongPtrW(hwnd, GWL_STYLE, style | WS_MAXIMIZEBOX | WS_THICKFRAME);
+        // Windows only draws the maximize caption button if BOTH WS_CAPTION
+        // and WS_SYSMENU are present. Keep an ordinary caption (not TOOLWINDOW).
+        let desired = style | WS_CAPTION | WS_SYSMENU | WS_MAXIMIZEBOX | WS_THICKFRAME;
+        if style != desired {
+            SetWindowLongPtrW(hwnd, GWL_STYLE, desired);
             SetWindowPos(hwnd, 0, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOZORDER | SWP_NOACTIVATE | 0x0001 | 0x0002);
         }
     }
 }
-/// Remove the *separate taskbar entry* for UxPlay, NOT the displayed
-/// video window. Changing extended styles of an already-visible window
-/// requires one short hide/show pair for Explorer to update the taskbar.
-/// This is called only once per new child-owned HWND, before normal controls.
-fn suppress_child_taskbar_button(hwnd: Hwnd) {
-    unsafe {
-        let old = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
-        let updated = (old & !WS_EX_APPWINDOW) | WS_EX_TOOLWINDOW;
-        if old == updated { return; }
-        // This is not a permanent ShowWindow(SW_HIDE): restore immediately,
-        // without activating the window or altering its playing pipeline.
-        ShowWindow(hwnd, SW_HIDE);
-        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, updated);
-        SetWindowPos(hwnd, 0, 0, 0, 0, 0,
-            SWP_FRAMECHANGED | SWP_NOZORDER | SWP_NOACTIVATE | 0x0001 | 0x0002);
-        ShowWindow(hwnd, SW_SHOWNA);
+// Using WS_EX_TOOLWINDOW to suppress Explorer's icon also removes the
+// standard maximize button. Use the Windows 7-compatible ITaskbarList COM
+// interface instead so the normal caption's maximize control is preserved.
+#[repr(C)]
+struct Guid { d1: u32, d2: u16, d3: u16, d4: [u8; 8] }
+const CLSID_TASKBAR_LIST: Guid = Guid { d1: 0x56fdf344, d2: 0xfd6d, d3: 0x11d0,
+    d4: [0x95, 0x8a, 0x00, 0x60, 0x97, 0xc9, 0xa0, 0x90] };
+const IID_ITASKBAR_LIST: Guid = Guid { d1: 0x56fdf342, d2: 0xfd6d, d3: 0x11d0,
+    d4: [0x95, 0x8a, 0x00, 0x60, 0x97, 0xc9, 0xa0, 0x90] };
+#[repr(C)]
+struct ITaskbarList { vtbl: *const ITaskbarListVtbl }
+#[repr(C)]
+struct ITaskbarListVtbl {
+    query_interface: unsafe extern "system" fn(*mut ITaskbarList, *const Guid, *mut *mut c_void) -> i32,
+    add_ref: unsafe extern "system" fn(*mut ITaskbarList) -> u32,
+    release: unsafe extern "system" fn(*mut ITaskbarList) -> u32,
+    hr_init: unsafe extern "system" fn(*mut ITaskbarList) -> i32,
+    add_tab: unsafe extern "system" fn(*mut ITaskbarList, Hwnd) -> i32,
+    delete_tab: unsafe extern "system" fn(*mut ITaskbarList, Hwnd) -> i32,
+    activate_tab: unsafe extern "system" fn(*mut ITaskbarList, Hwnd) -> i32,
+    set_active_alt: unsafe extern "system" fn(*mut ITaskbarList, Hwnd) -> i32,
+}
+#[link(name = "ole32")]
+extern "system" {
+    fn CoInitializeEx(reserved: *mut c_void, flags: u32) -> i32;
+    fn CoCreateInstance(clsid: *const Guid, outer: *mut c_void, context: u32,
+        iid: *const Guid, result: *mut *mut c_void) -> i32;
+    fn CoUninitialize();
+}
+struct Taskbar { interface: *mut ITaskbarList, initialized: bool }
+impl Taskbar {
+    fn new() -> Self {
+        unsafe {
+            let initialized = CoInitializeEx(std::ptr::null_mut(), 0x2) >= 0;
+            let mut interface: *mut ITaskbarList = std::ptr::null_mut();
+            if initialized {
+                let mut raw: *mut c_void = std::ptr::null_mut();
+                if CoCreateInstance(&CLSID_TASKBAR_LIST, std::ptr::null_mut(), 1,
+                    &IID_ITASKBAR_LIST, &mut raw) >= 0 && !raw.is_null() {
+                    let candidate = raw as *mut ITaskbarList;
+                    if ((*(*candidate).vtbl).hr_init)(candidate) >= 0 {
+                        interface = candidate;
+                    } else { ((*(*candidate).vtbl).release)(candidate); }
+                }
+            }
+            Self { interface, initialized }
+        }
+    }
+    fn suppress_child_taskbar_button(&self, hwnd: Hwnd) {
+        if self.interface.is_null() { return; }
+        unsafe { ((*(*self.interface).vtbl).delete_tab)(self.interface, hwnd); }
+    }
+}
+impl Drop for Taskbar {
+    fn drop(&mut self) {
+        unsafe {
+            if !self.interface.is_null() { ((*(*self.interface).vtbl).release)(self.interface); }
+            if self.initialized { CoUninitialize(); }
+        }
     }
 }
 
@@ -163,6 +207,7 @@ pub fn watch(child_pid: u32) {
     thread::spawn(move || {
         let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, 0, child_pid) };
         if process == 0 { return; }
+        let taskbar = Taskbar::new();
         let mut hwnd: Hwnd = 0;
         let mut fullscreen: Option<Windowed> = None;
         let mut mouse_was_down = false;
@@ -177,11 +222,14 @@ pub fn watch(child_pid: u32) {
                 fullscreen = None;
                 last_click = None;
                 last_title = Instant::now() - Duration::from_secs(5);
-                if hwnd != 0 { suppress_child_taskbar_button(hwnd); }
+                if hwnd != 0 { taskbar.suppress_child_taskbar_button(hwnd); }
             }
             if hwnd == 0 || unsafe { IsWindow(hwnd) } == 0 { continue; }
             if fullscreen.is_none() && last_title.elapsed() >= Duration::from_millis(1200) {
                 set_title_and_maximize_button(hwnd);
+                // Explorer can add a taskbar entry after initial discovery
+                // or after a shell restart. Refresh alongside the caption.
+                taskbar.suppress_child_taskbar_button(hwnd);
                 last_title = Instant::now();
             }
             let active = unsafe { GetForegroundWindow() } == hwnd;

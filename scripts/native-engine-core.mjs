@@ -72,7 +72,7 @@ export function storeEngine(source,{platform=process.platform,arch=process.arch,
     renameSync(temp,target);
     const receipt={schema:2,commit:LOCK.commit,rendererPatchSha256:RENDERER_PATCH_SHA256,target:id,sha256:hash,origin};
     writeFileSync(join(dir,'receipt.json'),JSON.stringify(receipt,null,2)+'\n');
-    return {binary:target,sha256:hash,receipt};
+    return {binary:realpathSync(target),sha256:hash,receipt};
   } finally {rmSync(temp,{force:true});}
 }
 export function prebuiltForTarget(id, registry) {

@@ -10,7 +10,7 @@ test('watermark uses existing UxPlay -vc pipeline, no Tauri overlay or extra win
   const rust=source('src-tauri/src/uxplay_args.rs');
   assert.match(rust,/args\.push\("-vc"\.into\(\)\);\s*args\.push\(converter\);/);
   assert.match(rust,/textoverlay text=Airpimo halignment=right valignment=bottom/);
-  assert.match(rust,/xpad=16 ypad=16 font-desc=/);
+  assert.match(rust,/xpad=12 ypad=12 font-desc=/);
   assert.match(rust,/color=0x99FFFFFF/);
   assert.match(rust,/draw-shadow=true draw-outline=false shaded-background=false/);
   assert.match(rust,/if brightness < 100/);

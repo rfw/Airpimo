@@ -48,14 +48,29 @@ static void airpimoInstallSafeClose(void) {
 @interface AirpimoVideoTitle : NSObject
 @property(nonatomic, strong) dispatch_source_t timer;
 @property(nonatomic, assign) BOOL dockPolicyApplied;
+@property(nonatomic, assign) BOOL dockPolicyFailureReported;
 @end
 @implementation AirpimoVideoTitle
 - (void)refreshVideoTitle {
     // This library is injected only into the Airpimo-managed UxPlay child.
     // Do not create a new NSApplication; GStreamer gst_macos_main owns its
     // initialization. Apply on the app main queue after Cocoa is ready.
-    if (!self.dockPolicyApplied && NSApp) {
-        self.dockPolicyApplied = [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+    if (!NSApp) return;
+    // GStreamer's gst_macos_main may set Regular AFTER our first attempt.
+    // Never treat one successful call as permanent; reapply only if another
+    // component changed the policy, on the Cocoa main queue.
+    if ([NSApp activationPolicy] != NSApplicationActivationPolicyAccessory) {
+        BOOL changed = [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+        if (changed && !self.dockPolicyApplied) {
+            static const char note[] = "AIRPIMO_DOCK_ACCESSORY_ACTIVE\n";
+            (void)write(STDERR_FILENO, note, sizeof(note) - 1);
+        }
+        if (!changed && !self.dockPolicyFailureReported) {
+            static const char fail[] = "AIRPIMO_DOCK_ACCESSORY_FAILED\n";
+            (void)write(STDERR_FILENO, fail, sizeof(fail) - 1);
+            self.dockPolicyFailureReported = YES;
+        }
+        self.dockPolicyApplied = changed;
     }
     for (NSWindow *window in NSApp.windows) {
         if (!window.visible || !airpimoIsVideoWindow(window)) continue;

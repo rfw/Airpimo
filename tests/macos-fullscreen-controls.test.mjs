@@ -17,3 +17,12 @@ test('helper is injected only into macOS child and built for both macOS architec
   assert.match(prep, /build-macos-fullscreen\.sh "\$TARGET"/);
   assert.match(build, /mmacosx-version-min=13\.0/);
 });
+
+test('macOS accessory dock policy is reasserted after Cocoa/GStreamer initialization', () => {
+  const native = load('native/fullscreen/uxplay-fullscreen-macos.m');
+  assert.match(native, /\[NSApp activationPolicy\] != NSApplicationActivationPolicyAccessory/);
+  assert.match(native, /\[NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory\]/);
+  assert.match(native, /AIRPIMO_DOCK_ACCESSORY_ACTIVE/);
+  assert.match(native, /dispatch_get_main_queue\(\)/);
+  assert.doesNotMatch(native, /NSApplicationActivationPolicyProhibited/);
+});

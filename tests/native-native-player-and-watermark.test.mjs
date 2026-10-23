@@ -15,8 +15,8 @@ test('Windows internal-mDNS renderer installs one adaptive watermark CAPS probe'
   const output=patchResponsiveWatermarkSource(source,{variant:'internal-mdns'});
   assert.match(output,/defined\(_WIN32\)/);
   assert.match(output,/airpimo_watermark_attach\(renderer_used->pipeline\);/);
-  assert.match(output,/portrait \? 24\.0 : 14\.0/);
-  assert.match(output,/portrait \? 22\.0 : 12\.0/);
+  assert.match(output,/portrait \? 16\.0 : 14\.0/);
+  assert.match(output,/portrait \? 12\.0 : 12\.0/);
   assert.equal((output.match(/airpimo_watermark_attach\(renderer_used->pipeline\);/g)??[]).length,1);
   assert.throws(()=>patchResponsiveWatermarkSource(source,{variant:'wrong'}),/Unsupported/);
   assert.throws(()=>patchResponsiveWatermarkSource(output,{variant:'internal-mdns'}),/already modified/);
@@ -38,9 +38,14 @@ test('Windows player removes only UxPlay child taskbar entry, not its video wind
   const win=read('src-tauri/src/windows_player.rs');
   assert.match(win,/suppress_child_taskbar_button\(hwnd\)/);
   assert.match(win,/GetWindowThreadProcessId/);
-  assert.match(win,/WS_EX_TOOLWINDOW/);
-  assert.match(win,/old & !WS_EX_APPWINDOW/);
-  assert.match(win,/ShowWindow\(hwnd, SW_HIDE\);[\s\S]*ShowWindow\(hwnd, SW_SHOWNA\);/);
+  assert.match(win,/ITaskbarList/);
+  assert.match(win,/CoCreateInstance/);
+  assert.match(win,/CoUninitialize/);
+  assert.match(win,/ITaskbarListVtbl/);
+  assert.match(win,/delete_tab/);
+  assert.match(win,/WS_CAPTION \| WS_SYSMENU \| WS_MAXIMIZEBOX/);
+  assert.doesNotMatch(win,/^const WS_EX_TOOLWINDOW/m);
+  assert.match(win,/WS_MAXIMIZEBOX/);
   assert.match(win,/GetDoubleClickTime/);
   assert.doesNotMatch(win,/SetWindowsHookEx|CreateRemoteThread/);
 });
@@ -48,7 +53,7 @@ test('Windows player removes only UxPlay child taskbar entry, not its video wind
 test('macOS child helper uses Accessory activation policy without changing full-screen or safe-close logic',()=>{
   const native=read('native/fullscreen/uxplay-fullscreen-macos.m');
   assert.match(native,/NSApplicationActivationPolicyAccessory/);
-  assert.match(native,/!self.dockPolicyApplied && NSApp/);
+  assert.match(native,/\[NSApp activationPolicy\] != NSApplicationActivationPolicyAccessory/);
   assert.match(native,/AIRPIMO_PLAYER_TITLE_CHILD/);
   assert.match(native,/airpimoInstallSafeClose/);
   assert.match(native,/\[self orderOut:nil\]/);

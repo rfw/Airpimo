@@ -42,11 +42,10 @@ export function smokeMacPackagedGstreamer(resources,{run=spawnSync}={}) {
       const match=(r.stdout??'').match(/^\s*Filename\s+(.+?)\s*$/m);
       if(!match)throw Error(`Packaged GStreamer element ${element} has no inspectable plugin filename`);
       const file=resolve(match[1]);
-      const rel=relative(pluginRoot,file);
       const actual=existsSync(file)?realpathSync(file):null;
-      const actualRel=actual?relative(pluginRoot,actual):null;
-      if(rel===''||rel==='..'||rel.startsWith(`..${sep}`)||isAbsolute(rel)||
-        !actual||actualRel===''||actualRel==='..'||actualRel.startsWith(`..${sep}`)||isAbsolute(actualRel)||
+      const rel=actual?relative(pluginRoot,actual):null;
+      
+      if(!actual||rel===''||rel==='..'||rel.startsWith(`..${sep}`)||isAbsolute(rel)||
         !packagedFiles.has(relative(root,actual).split(sep).join('/')))
         throw Error(`GStreamer element ${element} loaded outside packaged plugins or manifest: ${match[1]}`);
       count++;

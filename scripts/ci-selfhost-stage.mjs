@@ -35,7 +35,18 @@ export function stageSelfHosted(sourceTauri, target, {destinationTauri=buildTaur
   assert(spec.platform===platform&&spec.arch===arch,`Target ${target} requires ${spec.platform}/${spec.arch}; current host is ${platform}/${arch}`);
   assert(typeof sourceTauri==='string'&&isAbsolute(sourceTauri),'--source must be an absolute local src-tauri path');
   const source=realpathSync(resolve(sourceTauri));
-  const destination=resolve(destinationTauri);
+  // Resolve existing ancestors as well: /var -> /private/var is the same
+  // location on macOS, even when a future destination leaf does not exist.
+  const requested=resolve(destinationTauri);
+  let ancestor=requested;
+  const suffix=[];
+  while(!existsSync(ancestor)) {
+    const parent=dirname(ancestor);
+    if(parent===ancestor) throw Error('Cannot resolve self-hosted destination');
+    suffix.unshift(ancestor.slice(parent.length).replace(/^[/\\]/,''));
+    ancestor=parent;
+  }
+  const destination=resolve(realpathSync(ancestor),...suffix);
   assert(!inside(source,destination)&&!inside(destination,source),'Self-hosted asset source must be outside the GitHub Actions checkout');
   const sourceResources=join(source,'resources');
   const manifest=verifyNativeTree(sourceResources,{platform,arch});

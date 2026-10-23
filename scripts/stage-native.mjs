@@ -40,7 +40,7 @@ if(!internalMdns) {
   }
 }
 
-const sourceBinary=resolve(uxplay), sourceGst=resolve(gst);
+const sourceBinary=resolve(uxplay), sourceGst=realpathSync(resolve(gst));
 if (!existsSync(sourceBinary) || !statSync(sourceBinary).isFile()) die('找不到 UxPlay 可执行文件');
 if (!existsSync(sourceGst) || !statSync(sourceGst).isDirectory()) die('找不到 GStreamer runtime 目录');
 const binName=os==='win32'?'uxplay.exe':'uxplay';

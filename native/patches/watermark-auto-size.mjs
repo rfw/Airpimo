@@ -69,10 +69,10 @@ static void airpimo_watermark_apply_caps(AirpimoWatermarkProbe *state, const Gst
      * videoflip. Bound the resulting font on unusually small/large streams. */
     const gboolean portrait = ((gint64)width * par_n < (gint64)height * par_d);
     const gdouble relative_height = (gdouble)height / (portrait ? 1920.0 : 1080.0);
-    const gint font = CLAMP((gint)((portrait ? 24.0 : 14.0) * relative_height + 0.5),
-                            portrait ? 18 : 10, portrait ? 32 : 18);
-    const gint margin = CLAMP((gint)((portrait ? 22.0 : 12.0) * relative_height + 0.5),
-                              portrait ? 14 : 8, portrait ? 28 : 16);
+    const gint font = CLAMP((gint)((portrait ? 16.0 : 14.0) * relative_height + 0.5),
+                            portrait ? 12 : 10, portrait ? 24 : 18);
+    const gint margin = CLAMP((gint)((portrait ? 12.0 : 12.0) * relative_height + 0.5),
+                              portrait ? 8 : 8, portrait ? 18 : 16);
     gchar font_desc[32];
     g_snprintf(font_desc, sizeof(font_desc), "Sans %d", font);
 

@@ -106,7 +106,7 @@ pub fn effective(name: &str, fps: u16, brightness: u8, user: &str) -> Result<Vec
     }
     converter.push_str(concat!(
         " ! textoverlay text=Airpimo halignment=right valignment=bottom",
-        " xpad=16 ypad=16 font-desc=\"Sans 14\" color=0x99FFFFFF",
+        " xpad=12 ypad=12 font-desc=\"Sans 14\" color=0x99FFFFFF",
         " draw-shadow=true draw-outline=false shaded-background=false"
     ));
     // The native macOS/Windows renderer listens for CAPS changes on this
@@ -165,7 +165,7 @@ mod tests {
         let args = effective("Room", 60, 75, "").unwrap();
         let pipeline = args.windows(2).find(|pair| pair[0] == "-vc").unwrap()[1].as_str();
         assert!(pipeline.starts_with("videoconvert ! videobalance brightness=-0.25 ! textoverlay"));
-        for key in ["halignment=right", "valignment=bottom", "xpad=16", "ypad=16", "color=0x99FFFFFF"] {
+        for key in ["halignment=right", "valignment=bottom", "xpad=12", "ypad=12", "color=0x99FFFFFF"] {
             assert!(pipeline.contains(key), "missing {key}");
         }
         assert_eq!(args.iter().filter(|item| item.as_str() == "-vc").count(), 1);
