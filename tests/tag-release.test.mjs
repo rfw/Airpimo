@@ -34,11 +34,22 @@ test('one complete four-platform release generates unique assets and digest list
   const assets=await prepareReleaseAssets({tag:currentTag,input,out,projectRoot:root,sourceCommit:'a'.repeat(40)});
   assert.equal(assets.length,4);
   assert.equal(new Set(assets.map(x=>x.name)).size,4);
+  assert.deepEqual(assets.map(x=>x.name),[
+    `Airpimo_${currentVersion}_windows7-x64.exe`,
+    `Airpimo_${currentVersion}_windows10-11-x64.exe`,
+    `Airpimo_${currentVersion}_macos-intel-x64.dmg`,
+    `Airpimo_${currentVersion}_macos-arm64.dmg`,
+  ]);
   assert.ok(assets.every(x=>existsSync(join(out,x.name))));
-  assert.equal(readFileSync(join(out,'SHA256SUMS.txt'),'utf8').trim().split('\n').length,4);
+  const checksums=readFileSync(join(out,'SHA256SUMS.txt'),'utf8').trim().split('\n');
+  assert.equal(checksums.length,4);
+  assert.deepEqual(checksums.map(line=>line.split('  ')[1]),assets.map(x=>x.name));
   const manifest=JSON.parse(readFileSync(join(out,'release-provenance.json'),'utf8'));
   assert.equal(manifest.sourceCommit,'a'.repeat(40));
-  assert.equal(manifest.artifacts.length,4);
+  assert.deepEqual(manifest.artifacts.map(x=>x.name),assets.map(x=>x.name));
+  assert.deepEqual(manifest.artifacts.map(x=>x.platform),[
+    'windows7-x64','windows10-11-x64','macos-intel-x64','macos-arm64',
+  ]);
 }));
 test('no partial release when a platform is missing',()=>fixture(async dir=>{
   const input=join(dir,'input'),out=join(dir,'release');makeFour(input);

@@ -19,9 +19,10 @@ test('new settings use brightness 100% while previous user values are preserved'
   assert.match(read('src-tauri/src/settings.rs'),/settings::|pub fn load\(path:/);
 });
 test('published and locally built Windows 10/11 installer names agree',()=>{
-  assert.match(read('scripts/ci/prepare-release-assets.mjs'),/name:'windows10-11plus-x64'/);
-  assert.match(read('scripts/windows-build-artifacts.mjs'),/windows10-11plus-x64/);
-  assert.doesNotMatch(read('scripts/ci/prepare-release-assets.mjs'),/name:'windows10plus-x64'/);
+  assert.match(read('scripts/ci/prepare-release-assets.mjs'),/name:'windows10-11-x64'/);
+  assert.match(read('scripts/windows-build-artifacts.mjs'),/windows10-11-x64/);
+  assert.doesNotMatch(read('scripts/ci/prepare-release-assets.mjs'),/windows10-11plus-x64|windows10plus-x64/);
+  assert.doesNotMatch(read('scripts/windows-build-artifacts.mjs'),/windows10-11plus-x64/);
 });
 test('macOS uses only native titlebar fullscreen; title is changed in child process',()=>{
   const native=read('native/fullscreen/uxplay-fullscreen-macos.m');

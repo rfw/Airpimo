@@ -38,6 +38,9 @@ test('distinct build outputs are preserved without touching the original NSIS fi
     const b=preserveNsisInstaller(temp,'win10plus');
     assert.notEqual(a,b);
     assert.ok(existsSync(a));assert.ok(existsSync(b));
+    assert.equal(b,join(temp,'release-installers','win10plus','Airpimo_0.1.0_windows10-11-x64.exe'));
+    assert.equal(readFileSync(b,'utf8'),'fixture');
+    assert.doesNotMatch(b,/windows10-11plus-x64/);
     assert.throws(()=>preserveNsisInstaller(temp,'unknown'));
   } finally {rmSync(temp,{recursive:true,force:true})}
 });

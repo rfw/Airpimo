@@ -10,7 +10,7 @@ import {finished} from 'node:stream/promises';
 const defaultRoot=resolve(dirname(fileURLToPath(import.meta.url)),'../..');
 const specs=Object.freeze([
   {folder:'win7',name:'windows7-x64',extension:'.exe'},
-  {folder:'win10plus',name:'windows10-11plus-x64',extension:'.exe'},
+  {folder:'win10plus',name:'windows10-11-x64',extension:'.exe'},
   {folder:'macos-intel',name:'macos-intel-x64',target:'x86_64-apple-darwin',extension:'.dmg'},
   {folder:'macos-arm64',name:'macos-arm64',target:'aarch64-apple-darwin',extension:'.dmg'},
 ]);

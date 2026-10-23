@@ -19,7 +19,7 @@ export function preserveNsisInstaller(root, target, startedAtMs = 0) {
   const source = matches[0];
   const stem = source.name.replace(/\.exe$/i, '');
   // Keep internal candidate folders stable while using the public Win10/11 label.
-  const filename = target === 'win10plus' ? `Airpimo_${JSON.parse(readFileSync(join(root, 'package.json'),'utf8')).version}_windows10-11plus-x64.exe` : `${stem}-${target}.exe`;
+  const filename = target === 'win10plus' ? `Airpimo_${JSON.parse(readFileSync(join(root, 'package.json'),'utf8')).version}_windows10-11-x64.exe` : `${stem}-${target}.exe`;
   const result = join(dst, filename);
   copyFileSync(source.path, result);
   return result;
