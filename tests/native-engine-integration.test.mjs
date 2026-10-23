@@ -93,6 +93,7 @@ test('brightness is backed by real UxPlay -vc videobalance and retains Windows A
   const receiver=readFileSync(new URL('../src-tauri/src/receiver.rs', import.meta.url),'utf8');
   const settings=readFileSync(new URL('../src-tauri/src/settings.rs', import.meta.url),'utf8');
   const app=readFileSync(new URL('../src/App.tsx', import.meta.url),'utf8');
+  const settingsDialog=readFileSync(new URL('../src/components/AirpimoSettingsDialog.tsx', import.meta.url),'utf8');
   const args = readFileSync(new URL('../src-tauri/src/uxplay_args.rs', import.meta.url),'utf8');
   assert.match(args,/if brightness < 100/);
   assert.match(args,/videoconvert ! videobalance brightness=/);
@@ -103,6 +104,11 @@ test('brightness is backed by real UxPlay -vc videobalance and retains Windows A
   assert.match(receiver,/command\.args\(&effective_args\)/);
   assert.match(settings,/serde\(default = "default_brightness"\)/);
   assert.match(settings,/pub const fn default_brightness\(\) -> u8 \{ 100 \}/);
-  assert.match(app,/aria-label="画面亮度" type="range"/);
+  assert.match(app,/<AirpimoSettingsDialog\b/);
+  assert.match(app,/draft=\{draft\}/);
+  assert.match(app,/setDraft=\{setDraft\}/);
+  assert.match(settingsDialog,/aria-label="画面亮度"\s+type="range"/);
+  assert.match(settingsDialog,/min=\{0\}\s+max=\{100\}\s+step=\{5\}\s+value=\{draft\.brightness\}/);
+  assert.match(settingsDialog,/brightness: Number\(e\.target\.value\)/);
   assert.doesNotMatch(receiver,/"-vsync", "no"\]\);\s*\/\/.*windows/);
 });
