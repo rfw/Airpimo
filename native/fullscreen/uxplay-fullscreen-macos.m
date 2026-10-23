@@ -1,18 +1,11 @@
-// Airpimo Player: macOS video-window title and close-lifecycle guard.
-// Loaded only into the UxPlay child process, not the Tauri control window.
-// The macOS-native green title-bar fullscreen button remains the only fullscreen UI.
-// Set the child to Accessory policy so it does not create a second Dock icon.
-// Its actual player window remains visible and interactive.
-// On user Close, hide the window rather than destroying the GL-backed surface
-// while UxPlay continues to render on a separate RAOP thread. This is a
-// defensive workaround, not a fix for arbitrary upstream UxPlay crashes.
+// Airpimo Player: macOS player-window title, safe-close, and accessory-app guard.
+// Injected only into the Airpimo-managed UxPlay child process (never Tauri).
+// UxPlay/GStreamer owns the NSApplication and video window lifetime.
 #import <Cocoa/Cocoa.h>
 #import <dispatch/dispatch.h>
 #import <objc/runtime.h>
 #import <unistd.h>
 
-// Only UxPlay's own player window is affected. No global event monitoring,
-// no Tauri or other-process window modifications.
 static BOOL airpimoIsVideoWindow(NSWindow *window) {
     if (!window || window.frame.size.width < 120 || window.frame.size.height < 120) return NO;
     if (!(window.styleMask & NSWindowStyleMaskTitled)) return NO;
@@ -27,15 +20,13 @@ static BOOL airpimoIsVideoWindow(NSWindow *window) {
 @implementation NSWindow (AirpimoPlayerClose)
 - (void)airpimo_playerPerformClose:(id)sender {
     if (airpimoIsVideoWindow(self)) {
-        // performClose: is the macOS standard close-button / Cmd-W path.
-        // orderOut: preserves the GL surface and pipeline for the active
-        // receiver session; destroying them here races UxPlay's video thread.
+        // Keep the live GL surface intact; closing it while RAOP renders can crash.
         [self orderOut:nil];
         static const char note[] = "AIRPIMO_PLAYER_WINDOW_HIDDEN\n";
         (void)write(STDOUT_FILENO, note, sizeof(note) - 1);
         return;
     }
-    [self airpimo_playerPerformClose:sender]; // original implementation after swizzle
+    [self airpimo_playerPerformClose:sender]; // Swizzled original.
 }
 @end
 
@@ -45,6 +36,46 @@ static void airpimoInstallSafeClose(void) {
     if (original && guarded) method_exchangeImplementations(original, guarded);
 }
 
+// GStreamer-GL's Cocoa window creation calls
+//   [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular]
+// each time it creates its own window. Setting Accessory only on a periodic
+// timer allows that call to re-register UxPlay in Dock and the application
+// menu. Prevent this *in the child process* before Cocoa initializes.
+// Unlike Prohibited, Accessory still allows visible, interactive NSWindows.
+@interface NSApplication (AirpimoChildActivation)
+- (BOOL)airpimo_childSetActivationPolicy:(NSApplicationActivationPolicy)policy;
+@end
+@implementation NSApplication (AirpimoChildActivation)
+- (BOOL)airpimo_childSetActivationPolicy:(NSApplicationActivationPolicy)policy {
+    if (policy == NSApplicationActivationPolicyRegular) {
+        static dispatch_once_t noticeOnce;
+        dispatch_once(&noticeOnce, ^{
+            static const char note[] = "AIRPIMO_DOCK_REGULAR_BLOCKED\n";
+            (void)write(STDERR_FILENO, note, sizeof(note) - 1);
+        });
+        // A caller that wants Regular just needs a window; Accessory supports
+        // this without a Dock entry or a child-process menu bar.
+        if ([self activationPolicy] == NSApplicationActivationPolicyAccessory) return YES;
+        policy = NSApplicationActivationPolicyAccessory;
+    }
+    // After swizzling this invokes the original AppKit implementation.
+    return [self airpimo_childSetActivationPolicy:policy];
+}
+@end
+
+static void airpimoInstallDockGuard(void) {
+    Method original = class_getInstanceMethod([NSApplication class], @selector(setActivationPolicy:));
+    Method guarded = class_getInstanceMethod([NSApplication class], @selector(airpimo_childSetActivationPolicy:));
+    if (original && guarded) {
+        method_exchangeImplementations(original, guarded);
+        static const char note[] = "AIRPIMO_DOCK_GUARD_INSTALLED\n";
+        (void)write(STDERR_FILENO, note, sizeof(note) - 1);
+    } else {
+        static const char note[] = "AIRPIMO_DOCK_GUARD_FAILED\n";
+        (void)write(STDERR_FILENO, note, sizeof(note) - 1);
+    }
+}
+
 @interface AirpimoVideoTitle : NSObject
 @property(nonatomic, strong) dispatch_source_t timer;
 @property(nonatomic, assign) BOOL dockPolicyApplied;
@@ -52,25 +83,22 @@ static void airpimoInstallSafeClose(void) {
 @end
 @implementation AirpimoVideoTitle
 - (void)refreshVideoTitle {
-    // This library is injected only into the Airpimo-managed UxPlay child.
-    // Do not create a new NSApplication; GStreamer gst_macos_main owns its
-    // initialization. Apply on the app main queue after Cocoa is ready.
+    // This is the AppKit main queue. Never create NSApplication manually;
+    // gst_macos_main owns its initialization and event loop.
     if (!NSApp) return;
-    // GStreamer's gst_macos_main may set Regular AFTER our first attempt.
-    // Never treat one successful call as permanent; reapply only if another
-    // component changed the policy, on the Cocoa main queue.
     if ([NSApp activationPolicy] != NSApplicationActivationPolicyAccessory) {
         BOOL changed = [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
-        if (changed && !self.dockPolicyApplied) {
+        BOOL active = changed && ([NSApp activationPolicy] == NSApplicationActivationPolicyAccessory);
+        if (active && !self.dockPolicyApplied) {
             static const char note[] = "AIRPIMO_DOCK_ACCESSORY_ACTIVE\n";
             (void)write(STDERR_FILENO, note, sizeof(note) - 1);
         }
-        if (!changed && !self.dockPolicyFailureReported) {
-            static const char fail[] = "AIRPIMO_DOCK_ACCESSORY_FAILED\n";
-            (void)write(STDERR_FILENO, fail, sizeof(fail) - 1);
+        if (!active && !self.dockPolicyFailureReported) {
+            static const char note[] = "AIRPIMO_DOCK_ACCESSORY_FAILED\n";
+            (void)write(STDERR_FILENO, note, sizeof(note) - 1);
             self.dockPolicyFailureReported = YES;
         }
-        self.dockPolicyApplied = changed;
+        self.dockPolicyApplied = active;
     }
     for (NSWindow *window in NSApp.windows) {
         if (!window.visible || !airpimoIsVideoWindow(window)) continue;
@@ -88,7 +116,10 @@ static void airpimoInstallSafeClose(void) {
 
 __attribute__((constructor)) static void airpimoVideoTitleInit(void) {
     if (!getenv("AIRPIMO_PLAYER_TITLE_CHILD")) return;
+    // Swizzle before GStreamer's Cocoa window creation, not after the first
+    // frame or after the first attempt to promote UxPlay into Dock.
     airpimoInstallSafeClose();
+    airpimoInstallDockGuard();
     dispatch_async(dispatch_get_main_queue(), ^{
         static AirpimoVideoTitle *controller;
         if (!controller) { controller = [AirpimoVideoTitle new]; [controller start]; }

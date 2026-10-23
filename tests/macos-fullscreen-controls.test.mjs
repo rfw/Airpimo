@@ -26,3 +26,20 @@ test('macOS accessory dock policy is reasserted after Cocoa/GStreamer initializa
   assert.match(native, /dispatch_get_main_queue\(\)/);
   assert.doesNotMatch(native, /NSApplicationActivationPolicyProhibited/);
 });
+
+test('macOS UxPlay child blocks GStreamer Regular activation before Cocoa starts', () => {
+  const native = load('native/fullscreen/uxplay-fullscreen-macos.m');
+  assert.match(native, /@interface NSApplication \(AirpimoChildActivation\)/);
+  assert.match(native, /policy == NSApplicationActivationPolicyRegular/);
+  assert.match(native, /policy = NSApplicationActivationPolicyAccessory/);
+  assert.match(native, /class_getInstanceMethod\(\[NSApplication class\], @selector\(setActivationPolicy:\)\)/);
+  assert.match(native, /method_exchangeImplementations\(original, guarded\)/);
+  assert.match(native, /AIRPIMO_DOCK_REGULAR_BLOCKED/);
+  assert.match(native, /AIRPIMO_DOCK_GUARD_INSTALLED/);
+  const constructorBody = native.slice(native.indexOf('__attribute__((constructor))'));
+  assert.ok(constructorBody.indexOf('airpimoInstallDockGuard();') < constructorBody.indexOf('dispatch_async(dispatch_get_main_queue()'),
+    'policy guard must install before the Cocoa main-queue timer starts');
+  assert.match(constructorBody, /if \(!getenv\("AIRPIMO_PLAYER_TITLE_CHILD"\)\) return;/);
+  assert.doesNotMatch(native, /NSApplicationActivationPolicyProhibited/);
+  assert.doesNotMatch(native, /\[NSApplication sharedApplication\]/);
+});

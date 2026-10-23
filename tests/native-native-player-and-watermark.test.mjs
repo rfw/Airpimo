@@ -110,3 +110,15 @@ void select_video(void) {
   assert.throws(()=>patchResponsiveWatermarkSource(source.replace('gst_element_set_state', 'not_a_state_change'), options),/state contract changed/);
   assert.throws(()=>patchResponsiveWatermarkSource(source.replace('renderer->pipeline', 'some_other_object'), options),/state contract changed/);
 });
+
+test('GStreamer may try to re-promote its macOS player to a Dock app; child guard keeps Accessory', () => {
+  const native=read('native/fullscreen/uxplay-fullscreen-macos.m');
+  assert.match(native,/\[NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory\]/);
+  assert.match(native,/policy == NSApplicationActivationPolicyRegular/);
+  assert.match(native,/AIRPIMO_DOCK_REGULAR_BLOCKED/);
+  assert.match(native,/airpimoInstallDockGuard\(\);/);
+  assert.match(native,/AIRPIMO_DOCK_GUARD_FAILED/);
+  assert.match(native,/\[self orderOut:nil\]/);
+  assert.match(native,/window\.title = @"Airpimo Player"/);
+  assert.doesNotMatch(native,/NSApplicationActivationPolicyProhibited/);
+});
