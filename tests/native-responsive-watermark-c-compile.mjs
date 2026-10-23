@@ -18,8 +18,8 @@ void video_renderer_init(logger_t *render_logger, const char *server_name,
     g_mutex_unlock(&airpimo_renderer_mutex);
     gst_element_set_state (renderer->pipeline, GST_STATE_PLAYING);`;
   const patched=patchResponsiveWatermarkSource(fixture);
-  const begin=patched.indexOf('#ifdef __APPLE__');
-  const end=patched.indexOf('#endif /* __APPLE__ */',begin)+'#endif /* __APPLE__ */'.length;
+  const begin=patched.indexOf('#if defined(__APPLE__) || defined(_WIN32)');
+  const end=patched.indexOf('#endif /* __APPLE__ || _WIN32 */',begin)+'#endif /* __APPLE__ || _WIN32 */'.length;
   const csource=patched.slice(begin,end);
   const stub=`#include <stdint.h>
 #include <stddef.h>
@@ -83,7 +83,9 @@ ${csource}\n`;
   try {
     const path=join(dir,'watermark.c');
     writeFileSync(path,stub);
-    const result=spawnSync('cc',['-std=c11','-D__APPLE__','-fsyntax-only','-Wall','-Werror=implicit-function-declaration',path],{encoding:'utf8'});
-    assert.equal(result.status,0,result.stderr);
+    for (const osFlag of ['-D__APPLE__', '-D_WIN32']) {
+      const result=spawnSync('cc',['-std=c11',osFlag,'-fsyntax-only','-Wall','-Werror=implicit-function-declaration',path],{encoding:'utf8'});
+      assert.equal(result.status,0,`${osFlag}: ${result.stderr}`);
+    }
   } finally {rmSync(dir,{recursive:true,force:true});}
 });

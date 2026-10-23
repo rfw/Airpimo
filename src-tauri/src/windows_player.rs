@@ -48,6 +48,11 @@ extern "system" {
 }
 
 const GWL_STYLE: i32 = -16;
+const GWL_EXSTYLE: i32 = -20;
+const WS_EX_APPWINDOW: isize = 0x0004_0000;
+const WS_EX_TOOLWINDOW: isize = 0x0000_0080;
+const SW_HIDE: i32 = 0;
+const SW_SHOWNA: i32 = 8;
 const WS_MAXIMIZEBOX: isize = 0x0001_0000;
 const WS_THICKFRAME: isize = 0x0004_0000;
 const WS_OVERLAPPEDWINDOW: isize = 0x00cf_0000;
@@ -95,6 +100,25 @@ fn set_title_and_maximize_button(hwnd: Hwnd) {
         }
     }
 }
+/// Remove the *separate taskbar entry* for UxPlay, NOT the displayed
+/// video window. Changing extended styles of an already-visible window
+/// requires one short hide/show pair for Explorer to update the taskbar.
+/// This is called only once per new child-owned HWND, before normal controls.
+fn suppress_child_taskbar_button(hwnd: Hwnd) {
+    unsafe {
+        let old = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        let updated = (old & !WS_EX_APPWINDOW) | WS_EX_TOOLWINDOW;
+        if old == updated { return; }
+        // This is not a permanent ShowWindow(SW_HIDE): restore immediately,
+        // without activating the window or altering its playing pipeline.
+        ShowWindow(hwnd, SW_HIDE);
+        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, updated);
+        SetWindowPos(hwnd, 0, 0, 0, 0, 0,
+            SWP_FRAMECHANGED | SWP_NOZORDER | SWP_NOACTIVATE | 0x0001 | 0x0002);
+        ShowWindow(hwnd, SW_SHOWNA);
+    }
+}
+
 fn toggle(hwnd: Hwnd, current: &mut Option<Windowed>) {
     unsafe {
         if let Some(previous) = current.take() {
@@ -153,6 +177,7 @@ pub fn watch(child_pid: u32) {
                 fullscreen = None;
                 last_click = None;
                 last_title = Instant::now() - Duration::from_secs(5);
+                if hwnd != 0 { suppress_child_taskbar_button(hwnd); }
             }
             if hwnd == 0 || unsafe { IsWindow(hwnd) } == 0 { continue; }
             if fullscreen.is_none() && last_title.elapsed() >= Duration::from_millis(1200) {

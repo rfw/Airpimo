@@ -1,6 +1,8 @@
 // Airpimo Player: macOS video-window title and close-lifecycle guard.
 // Loaded only into the UxPlay child process, not the Tauri control window.
 // The macOS-native green title-bar fullscreen button remains the only fullscreen UI.
+// Set the child to Accessory policy so it does not create a second Dock icon.
+// Its actual player window remains visible and interactive.
 // On user Close, hide the window rather than destroying the GL-backed surface
 // while UxPlay continues to render on a separate RAOP thread. This is a
 // defensive workaround, not a fix for arbitrary upstream UxPlay crashes.
@@ -45,9 +47,16 @@ static void airpimoInstallSafeClose(void) {
 
 @interface AirpimoVideoTitle : NSObject
 @property(nonatomic, strong) dispatch_source_t timer;
+@property(nonatomic, assign) BOOL dockPolicyApplied;
 @end
 @implementation AirpimoVideoTitle
 - (void)refreshVideoTitle {
+    // This library is injected only into the Airpimo-managed UxPlay child.
+    // Do not create a new NSApplication; GStreamer gst_macos_main owns its
+    // initialization. Apply on the app main queue after Cocoa is ready.
+    if (!self.dockPolicyApplied && NSApp) {
+        self.dockPolicyApplied = [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
+    }
     for (NSWindow *window in NSApp.windows) {
         if (!window.visible || !airpimoIsVideoWindow(window)) continue;
         if (![window.title isEqualToString:@"Airpimo Player"]) window.title = @"Airpimo Player";

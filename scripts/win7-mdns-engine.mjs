@@ -6,6 +6,8 @@ import {existsSync,mkdirSync,readFileSync,writeFileSync,copyFileSync} from 'node
 import {join,resolve} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {PROJECT_ROOT} from './native-engine-core.mjs';
+import {applyResponsiveWatermarkPatch} from '../native/patches/watermark-auto-size.mjs';
+import {MDNS_WATERMARK_PATCH_SHA256} from './win7-mdns-core.mjs';
 import {MDNS_UPSTREAM,MDNS_LOCK_FILE,MDNS_FLAGS,readMdnsLock,fileSha256} from './win7-mdns-core.mjs';
 import {resolveGlobalGit,globalGitEnv} from './win7-global-git.mjs';
 import {win7MdnsEnvironments} from './win7-mdns-env.mjs';
@@ -68,6 +70,10 @@ function build() {
   run(git,['checkout','--detach','--force',lock.commit],{cwd:src,env:gitEnv});
   if(run(git,['rev-parse','HEAD'],{cwd:src,env:gitEnv}).toLowerCase()!==lock.commit)throw Error('Checkout is not the source pin');
   if(run(git,['status','--porcelain'],{cwd:src,env:gitEnv}))throw Error('Pinned upstream source is modified');
+  // The Windows mDNS engine is pinned independently of macOS. This
+  // fails closed if its reviewed GStreamer renderer activation changes.
+  applyResponsiveWatermarkPatch(join(src,'renderers','video_renderer.c'), {variant:'internal-mdns'});
+  run(git,['diff','--check','--','renderers/video_renderer.c'],{cwd:src,env:gitEnv});
   const cmakelists=readFileSync(join(src,'CMakeLists.txt'),'utf8');
   if(!/USE_DNS_SD/.test(cmakelists)||!/USE_MDNS/.test(cmakelists)||!existsSync(join(src,'lib','mdnsd','CMakeLists.txt')))throw Error('Pinned source does not contain UxPlay 1.74 internal lib/mdnsd; refusing legacy Bonjour implementation');
   run(cmake,['-S',src,'-B',buildDir,'-G','Ninja','-DCMAKE_BUILD_TYPE=Release',`-DCMAKE_C_COMPILER=${gcc}`,`-DCMAKE_CXX_COMPILER=${gxx}`,...MDNS_FLAGS],{env:toolEnv,live:true});
@@ -78,7 +84,7 @@ function build() {
   run(cmake,['--build',buildDir,'--config','Release','--parallel','2'],{env:toolEnv,live:true});
   const built=join(buildDir,'uxplay.exe');if(!existsSync(built))throw Error(`Missing built engine: ${built}`);
   const output=join(dir,'uxplay.exe'); copyFileSync(built,output);
-  const receipt={schema:1,discoveryBackend:'internal-mdns',sourceCommit:lock.commit,sha256:fileSha256(output),buildFlags:[...MDNS_FLAGS],gstreamerVersion:gstVersion,binary:output};
+  const receipt={schema:1,discoveryBackend:'internal-mdns',sourceCommit:lock.commit,sha256:fileSha256(output),watermarkPatchSha256:MDNS_WATERMARK_PATCH_SHA256,buildFlags:[...MDNS_FLAGS],gstreamerVersion:gstVersion,binary:output};
   writeFileSync(join(dir,'receipt.json'),JSON.stringify(receipt,null,2)+'\n');
   console.log(`[mdns] Experimental engine compiled and SHA-256 recorded: ${output}`);
   console.log('[mdns] Still NOT Win7-certified. Next: native:bundle:prepare:win7:mdns with matching MINGW64 DLLs, followed by Win7 real-host test without Bonjour.');

@@ -37,19 +37,19 @@ void video_renderer_destroy() {
     gst_element_set_state (renderer->pipeline, GST_STATE_PLAYING);`;
 const source = patchRendererSource(upstream);
 
-test('video caps changes automatically update only the named macOS watermark',()=>{
+test('video caps changes automatically update only the named cross-platform watermark',()=>{
   const c = patchResponsiveWatermarkSource(source);
-  assert.match(c, /#ifdef __APPLE__\s*\/\* The CAPS seen at video_sink/);
+  assert.match(c, /#if defined\(__APPLE__\) \|\| defined\(_WIN32\)\s*\/\* The CAPS seen at video_sink/);
   assert.match(c, /gst_event_parse_caps\(event, &caps\)/);
   assert.match(c, /gst_pad_add_probe\(pad, GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM/);
   assert.match(c, /gst_element_get_static_pad\(overlay, "video_sink"\)/);
   assert.match(c, /gst_bin_get_by_name\(GST_BIN\(pipeline\), "airpimo_watermark"\)/);
   assert.match(c, /width \* par_n < \(gint64\)height \* par_d/);
-  assert.match(c, /portrait \? 26\.0 : 12\.0/);
+  assert.match(c, /portrait \? 24\.0 : 14\.0/);
   assert.match(c, /g_object_set\(overlay, "font-desc", font_desc, "xpad", margin/);
   assert.match(c, /g_weak_ref_get\(&state->overlay\)/);
   assert.match(c, /g_weak_ref_clear\(&state->overlay\)/);
-  assert.match(c, /#ifdef __APPLE__\s*airpimo_watermark_attach\(renderer_used->pipeline\);\s*#endif/);
+  assert.match(c, /#if defined\(__APPLE__\) \|\| defined\(_WIN32\)\s*airpimo_watermark_attach\(renderer_used->pipeline\);\s*#endif/);
   assert.doesNotMatch(c, /gst_element_set_state\s*\([^;]*GST_STATE_NULL[^;]*\);\s*airpimo_watermark_attach/);
 });
 
@@ -70,9 +70,9 @@ test('written patch is deterministic and does not alter input if mismatch',()=>{
   } finally { rmSync(dir,{recursive:true,force:true}); }
 });
 
-test('mac-only named overlay and font override; Windows pipeline remains untouched',()=>{
+test('macOS and Windows both get named watermark, with no -vsync no default',()=>{
   const rust=readFileSync(new URL('../src-tauri/src/uxplay_args.rs',import.meta.url),'utf8');
-  assert.match(rust, /#\[cfg\(target_os = "macos"\)\]\s*converter\.push_str\(" name=airpimo_watermark auto-resize=false"\)/);
+  assert.match(rust, /#\[cfg\(any\(windows, target_os = "macos"\)\)\]\s*converter\.push_str\(" name=airpimo_watermark auto-resize=false"\)/);
   assert.match(rust, /xpad=16 ypad=16 font-desc=\\"Sans 14\\"/);
   assert.doesNotMatch(rust, /push_default\(&mut args, &custom, "-vsync", Some\("no"\)\)/);
 });

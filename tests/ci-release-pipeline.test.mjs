@@ -7,7 +7,7 @@ import {exportReleaseArchive,stageReleaseArchive} from '../scripts/ci-native-rel
 import {checkedReleaseAssetInputs,checkAssetSha} from '../scripts/ci-reviewed-asset.mjs';
 import {sha256} from '../scripts/native-bundle-core.mjs';
 import {RENDERER_PATCH_SHA256} from '../scripts/native-engine-core.mjs';
-import {MDNS_FLAGS,readMdnsLock} from '../scripts/win7-mdns-core.mjs';
+import {MDNS_FLAGS,readMdnsLock,MDNS_WATERMARK_PATCH_SHA256} from '../scripts/win7-mdns-core.mjs';
 const root=resolve(import.meta.dirname,'..');
 
 function fixture({platform='darwin',arch='x64',mdns=false}={}){
@@ -29,7 +29,7 @@ function fixture({platform='darwin',arch='x64',mdns=false}={}){
   }
   const lock=mdns?readMdnsLock():null;
   const manifest={schema:1,ready:true,os:platform,arch,gstreamerVersion:'1.24.13',upstream:{commit:lock?.commit??'df67c212a433cf6dda3676dd40c097900d24e645',...(!mdns?{rendererPatchSha256:RENDERER_PATCH_SHA256}:{})},files:entries};
-  if(mdns){manifest.upstream.tag='1.74-experimental-pinned';manifest.discovery={backend:'internal-mdns',engineSha256:entries.find(v=>v.path==='sidecar/uxplay.exe').sha256};}
+  if(mdns){manifest.upstream.tag='1.74-experimental-pinned';manifest.discovery={backend:'internal-mdns',engineSha256:entries.find(v=>v.path==='sidecar/uxplay.exe').sha256,watermarkPatchSha256:MDNS_WATERMARK_PATCH_SHA256};}
   writeFileSync(join(src,'native-manifest.json'),JSON.stringify(manifest));
   return {dir,src};
 }

@@ -1,9 +1,12 @@
 /**
- * Airpimo scoped macOS backport on pinned FDH2/UxPlay 1.73.7.
+ * Airpimo scoped cross-platform source transform on pinned FDH2/UxPlay 1.73.7.
  * React and window geometry are NOT involved. We track negotiated raw video
  * caps on the named textoverlay input as the iPhone changes orientation.
+ * macOS uses the renderer-lifetime-patched 1.73.7 tree; the Windows 1.74
+ * experimental internal-mDNS build has an independent source checkout.
  * Never restart / replace the GStreamer pipeline to resize the watermark.
- * Requires renderer-lifetime.mjs to have been applied first.
+ * Only pinned 1.73.7 requires renderer-lifetime.mjs first.
+ * The separate Windows mDNS checkout uses a reviewed direct renderer anchor.
  */
 import {readFileSync, writeFileSync} from 'node:fs';
 
@@ -16,7 +19,7 @@ function replaceExactlyOnce(source, needle, replacement, label) {
 }
 
 const nativeFunctions = String.raw`
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(_WIN32)
 /* The CAPS seen at video_sink are after UxPlay's videoflip/conversion stage:
  * orientation is thus based on actual rendered video, not the app window. */
 typedef struct {
@@ -66,8 +69,8 @@ static void airpimo_watermark_apply_caps(AirpimoWatermarkProbe *state, const Gst
      * videoflip. Bound the resulting font on unusually small/large streams. */
     const gboolean portrait = ((gint64)width * par_n < (gint64)height * par_d);
     const gdouble relative_height = (gdouble)height / (portrait ? 1920.0 : 1080.0);
-    const gint font = CLAMP((gint)((portrait ? 26.0 : 12.0) * relative_height + 0.5),
-                            portrait ? 18 : 10, portrait ? 32 : 16);
+    const gint font = CLAMP((gint)((portrait ? 24.0 : 14.0) * relative_height + 0.5),
+                            portrait ? 18 : 10, portrait ? 32 : 18);
     const gint margin = CLAMP((gint)((portrait ? 22.0 : 12.0) * relative_height + 0.5),
                               portrait ? 14 : 8, portrait ? 28 : 16);
     gchar font_desc[32];
@@ -123,39 +126,45 @@ static void airpimo_watermark_attach(GstElement *pipeline) {
     }
     gst_object_unref(overlay);
 }
-#endif /* __APPLE__ */
+#endif /* __APPLE__ || _WIN32 */
 
 `;
 
-export function patchResponsiveWatermarkSource(source) {
-  // These are reviewed exact anchors in our pinned renderer-lifetime transform.
-  // Refuse alternate layouts instead of risking another renderer lifetime crash.
-  if (!source.includes('static GMutex airpimo_renderer_mutex;')) {
+export function patchResponsiveWatermarkSource(source, {variant = 'pinned'} = {}) {
+  if (!['pinned', 'internal-mdns'].includes(variant)) throw Error('Unsupported renderer patch variant');
+  if (variant === 'pinned' && !source.includes('static GMutex airpimo_renderer_mutex;')) {
     throw Error('UxPlay watermark patch rejected: renderer-lifetime patch missing');
+  }
+  if (!source.includes('void video_renderer_init(logger_t *render_logger, const char *server_name,')) {
+    throw Error('UxPlay watermark patch rejected: unknown video renderer layout');
   }
   let next = replaceExactlyOnce(source,
     'void video_renderer_init(logger_t *render_logger, const char *server_name,',
     nativeFunctions + 'void video_renderer_init(logger_t *render_logger, const char *server_name,',
     'native helper insertion');
-  next = replaceExactlyOnce(next,
+  const activation = variant === 'pinned' ?
     `    g_mutex_lock(&airpimo_renderer_mutex);
     renderer = renderer_used;
     g_mutex_unlock(&airpimo_renderer_mutex);
-    gst_element_set_state (renderer->pipeline, GST_STATE_PLAYING);`,
-    `    g_mutex_lock(&airpimo_renderer_mutex);
-    renderer = renderer_used;
-    g_mutex_unlock(&airpimo_renderer_mutex);
-#ifdef __APPLE__
+    gst_element_set_state (renderer->pipeline, GST_STATE_PLAYING);` :
+    `    renderer = renderer_used;
+    gst_element_set_state (renderer->pipeline, GST_STATE_PLAYING);`;
+  if (variant === 'internal-mdns' && !source.includes('renderer = renderer_used;')) {
+    throw Error('UxPlay watermark patch rejected: internal-mDNS pipeline activation not found');
+  }
+  const replacement = activation.replace(
+    '    gst_element_set_state (renderer->pipeline, GST_STATE_PLAYING);',
+    `#if defined(__APPLE__) || defined(_WIN32)
     airpimo_watermark_attach(renderer_used->pipeline);
 #endif
-    gst_element_set_state (renderer->pipeline, GST_STATE_PLAYING);`,
-    'active video pipeline activation');
+    gst_element_set_state (renderer->pipeline, GST_STATE_PLAYING);`);
+  next = replaceExactlyOnce(next, activation, replacement, 'active video pipeline activation');
   return next;
 }
 
-export function applyResponsiveWatermarkPatch(file) {
+export function applyResponsiveWatermarkPatch(file, options) {
   const original = readFileSync(file, 'utf8');
-  const patched = patchResponsiveWatermarkSource(original);
+  const patched = patchResponsiveWatermarkSource(original, options);
   if (patched === original) throw Error('UxPlay watermark patch produced no modifications');
   writeFileSync(file, patched);
 }

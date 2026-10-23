@@ -4,7 +4,7 @@ import {mkdtempSync,writeFileSync,rmSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {readFileSync} from 'node:fs';
-import {MDNS_FLAGS,checkMdnsLock,verifyMdnsReceipt,verifyMdnsManifest,fileSha256} from '../scripts/win7-mdns-core.mjs';
+import {MDNS_FLAGS,checkMdnsLock,verifyMdnsReceipt,verifyMdnsManifest,fileSha256,MDNS_WATERMARK_PATCH_SHA256} from '../scripts/win7-mdns-core.mjs';
 const COMMIT='a'.repeat(40);
 const lock={schema:1,upstream:'https://github.com/FDH2/UxPlay.git',track:'1.74-experimental',target:'win32-x64',commit:COMMIT,buildFlags:[...MDNS_FLAGS]};
 
@@ -28,8 +28,9 @@ test('mDNS engine build receipt binds exact binary SHA, compiler flags and pinne
   const root=mkdtempSync(join(tmpdir(),'uxplay-mdns-test-'));
   try {
     const exe=join(root,'uxplay.exe');writeFileSync(exe,Buffer.from('MZfake-internal-mdns-1.74'));
-    const receipt={schema:1,discoveryBackend:'internal-mdns',sourceCommit:COMMIT,sha256:fileSha256(exe),buildFlags:[...MDNS_FLAGS]};
+    const receipt={schema:1,discoveryBackend:'internal-mdns',sourceCommit:COMMIT,sha256:fileSha256(exe),watermarkPatchSha256:MDNS_WATERMARK_PATCH_SHA256,buildFlags:[...MDNS_FLAGS]};
     assert.equal(verifyMdnsReceipt(receipt,{lock,binary:exe}),true);
+    assert.throws(()=>verifyMdnsReceipt({...receipt,watermarkPatchSha256:'0'.repeat(64)},{lock,binary:exe}),/does not match/);
     assert.throws(()=>verifyMdnsReceipt({...receipt,buildFlags:['-DUSE_DNS_SD=ON']},{lock,binary:exe}),/does not prove/);
     assert.throws(()=>verifyMdnsReceipt({...receipt,sourceCommit:'b'.repeat(40)},{lock,binary:exe}),/does not match/);
     writeFileSync(exe,'tampered');
@@ -39,8 +40,9 @@ test('mDNS engine build receipt binds exact binary SHA, compiler flags and pinne
 
 test('release manifest must match engine SHA and pinned experimental commit',()=>{
   const sha='b'.repeat(64);
-  const manifest={os:'win32',arch:'x64',upstream:{tag:'1.74-experimental-pinned',commit:COMMIT},discovery:{backend:'internal-mdns',engineSha256:sha},files:[{path:'sidecar/uxplay.exe',sha256:sha}]};
+  const manifest={os:'win32',arch:'x64',upstream:{tag:'1.74-experimental-pinned',commit:COMMIT},discovery:{backend:'internal-mdns',engineSha256:sha,watermarkPatchSha256:MDNS_WATERMARK_PATCH_SHA256},files:[{path:'sidecar/uxplay.exe',sha256:sha}]};
   assert.equal(verifyMdnsManifest(manifest,{lock}),true);
+  assert.throws(()=>verifyMdnsManifest({...manifest,discovery:{...manifest.discovery,watermarkPatchSha256:'0'.repeat(64)}},{lock}),/requires an audited/);
   assert.throws(()=>verifyMdnsManifest({...manifest,discovery:{...manifest.discovery,engineSha256:'c'.repeat(64)}},{lock}),/SHA-256 differs/);
   assert.throws(()=>verifyMdnsManifest({...manifest,upstream:{...manifest.upstream,commit:'0'.repeat(40)}},{lock}),/requires an audited/);
 });

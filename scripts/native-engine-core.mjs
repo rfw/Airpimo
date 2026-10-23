@@ -136,7 +136,7 @@ export function buildEngine({platform=process.platform,arch=process.arch,env=pro
   // Checkout above restores pristine pinned upstream on every build.
   // Fail closed when upstream source no longer matches the reviewed anchors.
   applyRendererPatch(join(src,'renderers','video_renderer.c'));
-  if(platform==='darwin') applyResponsiveWatermarkPatch(join(src,'renderers','video_renderer.c'));
+  if(platform==='darwin' || platform==='win32') applyResponsiveWatermarkPatch(join(src,'renderers','video_renderer.c'));
   applyAudioEmptyPacketPatch(join(src,'lib','raop_buffer.c'), join(src,'lib','raop_rtp.c'));
   exec('git',['diff','--check','--','renderers/video_renderer.c','lib/raop_buffer.c','lib/raop_rtp.c'],src);
   const generator=platform==='win32'?['-G','Ninja']:[];

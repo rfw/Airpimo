@@ -188,6 +188,6 @@ function walk(p,relative='') {
   }
 }
 walk(outSidecar,'sidecar');walk(outGst,'gstreamer');
-const manifest={schema:1,ready:true,os,arch,upstream:{repository:'https://github.com/FDH2/UxPlay',tag:internalMdns?'1.74-experimental-pinned':'v1.73.7',commit:internalMdns?commit.toLowerCase():UPSTREAM,...(!internalMdns?{rendererPatchSha256:patchSha.toLowerCase()}:{})},...(internalMdns?{discovery:{backend:'internal-mdns',engineSha256:createHash('sha256').update(readFileSync(sourceBinary)).digest('hex')}}:{}),gstreamerVersion:gstVersion,files:files.sort((a,b)=>a.path.localeCompare(b.path))};
+const manifest={schema:1,ready:true,os,arch,upstream:{repository:'https://github.com/FDH2/UxPlay',tag:internalMdns?'1.74-experimental-pinned':'v1.73.7',commit:internalMdns?commit.toLowerCase():UPSTREAM,...(!internalMdns?{rendererPatchSha256:patchSha.toLowerCase()}:{})},...(internalMdns?{discovery:{backend:'internal-mdns',engineSha256:createHash('sha256').update(readFileSync(sourceBinary)).digest('hex'),watermarkPatchSha256:(await import('./win7-mdns-core.mjs')).MDNS_WATERMARK_PATCH_SHA256}}:{}),gstreamerVersion:gstVersion,files:files.sort((a,b)=>a.path.localeCompare(b.path))};
 writeFileSync(join(DEST,'native-manifest.json'),JSON.stringify(manifest,null,2)+'\n');
 console.log(`已准备 ${files.length} 个本地运行时文件。注意：静态文件检查不代表 Win7/macOS 干净机测试通过。`);

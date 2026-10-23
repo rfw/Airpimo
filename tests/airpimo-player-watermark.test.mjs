@@ -37,13 +37,13 @@ test('Windows 7 and modern Windows validate watermark plugin on SDK and packaged
 });
 
 
-test('macOS mirroring watermark opts into native orientation-aware dynamic size',()=>{
+test('macOS and Windows mirroring watermark opts into native orientation-aware size',()=>{
   const rust=source('src-tauri/src/uxplay_args.rs');
   const native=source('native/patches/watermark-auto-size.mjs');
   const engine=source('scripts/native-engine-core.mjs');
-  assert.match(rust, /#\[cfg\(target_os = "macos"\)\]\s*converter\.push_str\(" name=airpimo_watermark auto-resize=false"\)/);
+  assert.match(rust, /#\[cfg\(any\(windows, target_os = "macos"\)\)\]\s*converter\.push_str\(" name=airpimo_watermark auto-resize=false"\)/);
   assert.match(native, /GST_EVENT_CAPS/);
   assert.match(native, /pixel-aspect-ratio/);
   assert.match(native, /airpimo_watermark_attach\(renderer_used->pipeline\)/);
-  assert.match(engine, /if\(platform==='darwin'\) applyResponsiveWatermarkPatch/);
+  assert.match(engine, /if\(platform==='darwin' \|\| platform==='win32'\) applyResponsiveWatermarkPatch/);
 });

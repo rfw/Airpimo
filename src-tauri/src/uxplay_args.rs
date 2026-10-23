@@ -109,9 +109,9 @@ pub fn effective(name: &str, fps: u16, brightness: u8, user: &str) -> Result<Vec
         " xpad=16 ypad=16 font-desc=\"Sans 14\" color=0x99FFFFFF",
         " draw-shadow=true draw-outline=false shaded-background=false"
     ));
-    // The native macOS renderer listens for CAPS changes on this named
-    // overlay, then adjusts font and margins as the iPhone rotates.
-    #[cfg(target_os = "macos")]
+    // The native macOS/Windows renderer listens for CAPS changes on this
+    // named overlay, and adjusts font/margins when iPhone rotates.
+    #[cfg(any(windows, target_os = "macos"))]
     converter.push_str(" name=airpimo_watermark auto-resize=false");
     args.push("-vc".into());
     args.push(converter);

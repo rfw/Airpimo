@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import {join,dirname,resolve} from 'node:path';
 import {stageSelfHosted} from '../scripts/ci-selfhost-stage.mjs';
 import {sha256} from '../scripts/native-bundle-core.mjs';
-import {readMdnsLock} from '../scripts/win7-mdns-core.mjs';
+import {readMdnsLock,MDNS_WATERMARK_PATCH_SHA256} from '../scripts/win7-mdns-core.mjs';
 import {LOCK,RENDERER_PATCH_SHA256} from '../scripts/native-engine-core.mjs';
 function fixture({platform='win32',arch='x64',legacy=false}={}){
   const root=mkdtempSync(join(tmpdir(),'uxplay-selfhost-'));
@@ -29,7 +29,7 @@ function fixture({platform='win32',arch='x64',legacy=false}={}){
   const manifest={schema:1,ready:true,os:platform,arch,gstreamerVersion:'1.24.13',
     upstream:{commit:platform==='darwin'?LOCK.commit:(legacy?'df67c212a433cf6dda3676dd40c097900d24e645':lock.commit),tag:'1.74-experimental-pinned',...(platform==='darwin'||legacy?{rendererPatchSha256:RENDERER_PATCH_SHA256}:{})},
     files:entries};
-  if(platform==='win32'&&!legacy)manifest.discovery={backend:'internal-mdns',engineSha256:entries[0].sha256};
+  if(platform==='win32'&&!legacy)manifest.discovery={backend:'internal-mdns',engineSha256:entries[0].sha256,watermarkPatchSha256:MDNS_WATERMARK_PATCH_SHA256};
   writeFileSync(join(source,'resources','native-manifest.json'),JSON.stringify(manifest));
   const browser=join(source,'webview2-109');mkdirSync(browser,{recursive:true});
   writeFileSync(join(browser,'msedgewebview2.exe'),'webview109-placeholder');
