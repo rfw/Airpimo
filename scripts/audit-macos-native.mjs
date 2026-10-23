@@ -48,7 +48,8 @@ export function auditMacNative(resourceDir,{run=spawnSync, manifest}={}) {
     allowed.add(real);
     if(isMachO(real)) entries.push({name,file:real});
   }
-  const executable=realpathSync(join(root,'sidecar','uxplay'));
+  const stagedName=data.files?.some(f=>f.path==='sidecar/Airpimo')?'Airpimo':'uxplay';
+  const executable=realpathSync(join(root,'sidecar',stagedName));
   if(!entries.some(v=>v.file===executable)) problems.push('Missing Mach-O UxPlay executable');
   const scanned=new Map();
   function command(args,file) {

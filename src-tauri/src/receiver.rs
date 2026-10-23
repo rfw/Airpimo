@@ -450,7 +450,8 @@ fn sidecar_path(app: &AppHandle) -> Result<(PathBuf, bool), String> {
     }
     let dir = app.path().resource_dir().map_err(|e| e.to_string())?;
     #[cfg(windows)] let filename = "uxplay.exe";
-    #[cfg(not(windows))] let filename = "uxplay";
+    #[cfg(target_os = "macos")] let filename = "Airpimo";
+    #[cfg(all(not(windows), not(target_os = "macos")))] let filename = "uxplay";
     let path = dir.join("sidecar").join(filename);
     if path.is_file() { return Ok((path, false)); }
     #[cfg(debug_assertions)] {

@@ -13,6 +13,7 @@ import {verifyNativeTree} from './native-bundle-core.mjs';
 import {readFileSync} from 'node:fs';
 import {readMdnsLock,verifyMdnsReceipt} from './win7-mdns-core.mjs';
 import {readWin7GstSdkVersion} from './ci/gst-sdk-version.mjs';
+import {applyWindowsPrune} from './prune-windows-native.mjs';
 const args=process.argv.slice(2);
 function option(flag){const i=args.indexOf(flag);return i<0?null:args[i+1]}
 const win7=args.includes('--win7');
@@ -182,9 +183,14 @@ function main() {
       const aligned=alignWin7Runtime(candidate,resolve(dllSource));
       console.log(`[win7] Paired MSYS2 engine runtime and resolved mandatory DLLs: ${aligned.changed.join(', ')||'none'}`);
       console.log(`[win7] Static ABI check PASS (${aligned.inspected} PE dependency nodes)`);
+      const pruned=applyWindowsPrune(candidate);
+      console.log(`[win-runtime] Selected ${pruned.selectedPlugins.length} plugin DLLs; excluded ${pruned.removed.length} unused native assets (${(pruned.removedBytes/1048576).toFixed(1)} MiB uncompressed)`);
       smokeWin7Plugins(candidate);
       console.log('[win7] Build-host GStreamer libav/H.264/AAC plugin smoke PASS');
       promoteNativeCandidate(candidate,join(PROJECT_ROOT,'src-tauri','resources'));
+    } else if(process.platform==='win32') {
+      const pruned=applyWindowsPrune(join(PROJECT_ROOT,'src-tauri','resources'));
+      console.log(`[win-runtime] Selected ${pruned.selectedPlugins.length} plugin DLLs; excluded ${pruned.removed.length} unused native assets (${(pruned.removedBytes/1048576).toFixed(1)} MiB uncompressed)`);
     }
     console.log('Staging complete. Independent Windows 7 SP1 clean-host AirPlay/mDNS test is still mandatory.');
   } catch(error) {

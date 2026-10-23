@@ -23,6 +23,7 @@
     "desktop:build:mac": "node scripts/check-native.mjs && npm run test && npm run test:source && npx tauri build --target x86_64-apple-darwin --bundles dmg && npm run native:verify:app",
     "native:relocate:mac": "node scripts/relocate-macos-native.mjs",
     "native:prune:mac": "node scripts/prune-macos-native.mjs",
+    "native:prune:win": "node scripts/prune-windows-native.mjs",
     "native:prepare": "node scripts/native-engine.mjs prepare",
     "native:status": "node scripts/native-engine.mjs status",
     "native:export": "node scripts/native-export.mjs",

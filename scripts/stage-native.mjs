@@ -44,6 +44,7 @@ const sourceBinary=resolve(uxplay), sourceGst=realpathSync(resolve(gst));
 if (!existsSync(sourceBinary) || !statSync(sourceBinary).isFile()) die('找不到 UxPlay 可执行文件');
 if (!existsSync(sourceGst) || !statSync(sourceGst).isDirectory()) die('找不到 GStreamer runtime 目录');
 const binName=os==='win32'?'uxplay.exe':'uxplay';
+const stagedBinName=os==='darwin'?'Airpimo':binName; // user-facing firewall process identity, source cache unchanged
 if (basename(sourceBinary).toLowerCase()!==binName) die(`引擎文件名必须为 ${binName}`);
 for(const suffix of ['bin','lib/gstreamer-1.0']) if(!existsSync(join(sourceGst,suffix))) die(`GStreamer 缺少 ${suffix}`);
 const sourceStart=readFileSync(sourceBinary).subarray(0,4);
@@ -51,9 +52,9 @@ if(os==='win32' && sourceStart.toString('latin1',0,2)!=='MZ') die('Windows 版�
 if(os==='darwin' && !['feedfacf','cffaedfe','cafebabe','bebafeca'].includes(sourceStart.toString('hex'))) die('macOS 版本必须为 Mach-O 或通用二进制');
 const outSidecar=join(DEST,'sidecar'); const outGst=join(DEST,'gstreamer');
 mkdirSync(outSidecar,{recursive:true});
-for(const name of ['uxplay','uxplay.exe']) rmSync(join(outSidecar,name),{force:true});
-copyFileSync(sourceBinary,join(outSidecar,binName));
-if(os==='darwin') chmodSync(join(outSidecar,binName),0o755);
+for(const name of ['uxplay','uxplay.exe','Airpimo']) rmSync(join(outSidecar,name),{force:true});
+copyFileSync(sourceBinary,join(outSidecar,stagedBinName));
+if(os==='darwin') chmodSync(join(outSidecar,stagedBinName),0o755);
 rmSync(join(outGst,'bin'),{recursive:true,force:true}); rmSync(join(outGst,'lib'),{recursive:true,force:true}); rmSync(join(outGst,'libexec'),{recursive:true,force:true});
 // The host SDK contains static libraries, development files and unrelated
 // Homebrew tools. The macOS prefix also contains dangling formula symlinks

@@ -87,7 +87,8 @@ export function planMacPrune(resources,{gst,run=spawnSync,manifest}={}) {
   }
   if(!VIDEO_SINKS.some(element=>provided.includes(element)))
     failures.push('No macOS video sink (glimagesink/osxvideosink) was found in the staged runtime');
-  const roots=['sidecar/uxplay','gstreamer/bin/gst-inspect-1.0',
+  const sidecar=paths.has('sidecar/Airpimo')?'sidecar/Airpimo':'sidecar/uxplay';
+  const roots=[sidecar,'gstreamer/bin/gst-inspect-1.0',
     paths.has('gstreamer/libexec/gstreamer-1.0/gst-plugin-scanner')
       ?'gstreamer/libexec/gstreamer-1.0/gst-plugin-scanner'
       :'gstreamer/bin/gst-plugin-scanner',...selected];

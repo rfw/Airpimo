@@ -51,7 +51,7 @@ export function planMacRelocation(resources,{run=spawnSync, manifest}={}) {
       if(name!==replacement)operations.push({type:'change',file:entry.file,path:entry.path,from:name,to:replacement});
     }
   }
-  if(!bins.some(v=>v.path==='sidecar/uxplay')) problems.push('No Mach-O sidecar/uxplay found');
+  if(!bins.some(v=>v.path==='sidecar/Airpimo'||v.path==='sidecar/uxplay')) problems.push('No Mach-O macOS receiver sidecar found');
   return {ok:problems.length===0,filesExamined:bins.length,problems,operations};
 }
 export function applyMacRelocation(resources,{run=spawnSync}={}) {

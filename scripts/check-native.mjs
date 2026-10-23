@@ -44,7 +44,7 @@ for(const file of manifest.files){
   const hash=createHash('sha256').update(readFileSync(full)).digest('hex');
   if(hash!==file.sha256) fail(`SHA256 校验失败: ${file.path}`);
 }
-const binName=process.platform==='win32'?'uxplay.exe':'uxplay';
+const binName=process.platform==='win32'?'uxplay.exe':'Airpimo';
 const ux=join(root,'sidecar',binName);
 if(!existsSync(ux)) fail('缺少 UxPlay 引擎');
 if(!existsSync(join(root,'gstreamer','lib','gstreamer-1.0'))) fail('插件目录缺失');
