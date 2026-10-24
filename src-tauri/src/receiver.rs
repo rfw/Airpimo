@@ -1,4 +1,4 @@
-use crate::{diagnostic::{self, Observation}, power_inhibit::PowerInhibitor, settings::{self, Settings}};
+use crate::{diagnostic::{self, Observation}, power_inhibit::PowerInhibitor, settings::{self, Settings, Theme}};
 use serde::Serialize;
 use std::{collections::VecDeque, io::{BufRead, BufReader, Read}, path::{Path, PathBuf}, process::{Child, Command, Stdio}, sync::{Arc, Mutex}, thread, time::{Duration, Instant, SystemTime, UNIX_EPOCH}};
 use tauri::{AppHandle, Emitter, Manager};
@@ -144,6 +144,22 @@ impl Controller {
         { let mut inner = self.inner.lock().unwrap();
           settings::save(&self.settings_path, &next)?;
           inner.settings = next; inner.log("settings_saved"); }
+        self.publish(app);
+        Ok(self.snapshot())
+    }
+    // Persist only the appearance field. No receiver stop/start, args update or
+    // unrelated draft configuration can be committed by this IPC.
+    pub fn set_theme(self: &Arc<Self>, app: &AppHandle, theme: Theme) -> Result<Snapshot,String> {
+        {
+            let mut inner = self.inner.lock().unwrap();
+            if inner.settings.theme == theme { return Ok(inner.snapshot()); }
+            let mut next = inner.settings.clone();
+            next.theme = theme;
+            // Write first so a failed disk operation does not change live state.
+            settings::save(&self.settings_path, &next)?;
+            inner.settings = next;
+            inner.log("appearance_saved");
+        }
         self.publish(app);
         Ok(self.snapshot())
     }

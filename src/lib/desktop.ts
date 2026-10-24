@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import type { Settings, Snapshot } from '../domain/state';
+import type { Settings, Snapshot, ThemeChoice } from '../domain/state';
 export const isDesktop = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 function requireDesktop() { if (!isDesktop()) throw new Error('请在 Tauri 桌面应用中启动（浏览器仅供 UI 预览）'); }
 export const desktop = {
@@ -10,6 +10,7 @@ export const desktop = {
   async stop(): Promise<Snapshot> { requireDesktop(); return invoke('stop_receiving'); },
   async retry(): Promise<Snapshot> { requireDesktop(); return invoke('retry_receiving'); },
   async save(settings: Settings): Promise<Snapshot> { requireDesktop(); return invoke('save_settings', { settings }); },
+  async setTheme(theme: ThemeChoice): Promise<Snapshot> { requireDesktop(); return invoke('set_theme', { theme }); },
   async diagnostics(): Promise<string> { requireDesktop(); return invoke('get_diagnostics'); },
   async exportDiagnostics(): Promise<string> { requireDesktop(); return invoke('export_diagnostics'); },
   async openProjectPage(): Promise<void> { requireDesktop(); return invoke('open_project_page'); },

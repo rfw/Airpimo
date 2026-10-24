@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useI18n } from "./lib/i18n-react";
+import { translate } from "./lib/i18n";
 import { brand } from './brand';
-import { defaultSnapshot, validateDeviceName, validateBrightness, validateFps, validateUxplayArgs, type Settings, type Snapshot } from './domain/state';
+import { defaultSnapshot, validateDeviceName, validateBrightness, validateFps, validateUxplayArgs, type Settings, type Snapshot, type ThemeChoice } from './domain/state';
 import { copyText } from './lib/copy';
 import { desktop, isDesktop } from './lib/desktop';
 import { AirpimoHome } from './components/AirpimoHome';
@@ -8,7 +10,17 @@ import { checkAtStartup, checkForRelease, type ReleaseStatus } from './lib/relea
 import { AirpimoSettingsDialog, AirpimoUpdateNotice, type SettingsTab } from './components/AirpimoSettingsDialog';
 
 function App() {
-  const [snapshot, setSnapshot] = useState<Snapshot>(defaultSnapshot);
+  const { language } = useI18n();
+  const [snapshot, setSnapshot] = useState<Snapshot>(() => {
+    // Browser preview also retains appearance across reloads; the native app
+    // always uses the persisted Rust Settings as its source of truth.
+    if (isDesktop()) return defaultSnapshot;
+    try {
+      const stored = localStorage.getItem('airpimo.theme');
+      const theme: ThemeChoice = stored === 'dark' || stored === 'light' ? stored : 'system';
+      return { ...defaultSnapshot, settings: { ...defaultSnapshot.settings, theme } };
+    } catch { return defaultSnapshot; }
+  });
   const [ready, setReady] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -27,6 +39,15 @@ function App() {
   const [draft, setDraft] = useState<Settings>(defaultSnapshot.settings);
   const [formError, setFormError] = useState('');
   const [bootError, setBootError] = useState('');
+  const [themeSaving, setThemeSaving] = useState(false);
+  const [themeError, setThemeError] = useState('');
+  const themeSaveInFlight = useRef(false);
+  // Hide stale native snapshots while an appearance write is pending.
+  const pendingTheme = useRef<ThemeChoice | null>(null);
+  const applyNativeSnapshot = useCallback((value: Snapshot) => {
+    const selected = pendingTheme.current;
+    setSnapshot(selected === null ? value : { ...value, settings: { ...value.settings, theme: selected } });
+  }, []);
 
   // Keep the static boot screen until backend snapshot/error initialization completes.
   useEffect(() => {
@@ -43,15 +64,15 @@ function App() {
     }
     (async () => {
       try {
-        unlisten = await desktop.watch(value => { if (alive) setSnapshot(value); });
+        unlisten = await desktop.watch(value => { if (alive) applyNativeSnapshot(value); });
         const value = await desktop.snapshot();
-        if (alive) setSnapshot(value);
+        if (alive) applyNativeSnapshot(value);
       } catch (error) {
         if (alive) setBootError(String(error));
       } finally { if (alive) setReady(true); }
     })();
     return () => { alive = false; unlisten?.(); };
-  }, []);
+  }, [applyNativeSnapshot]);
   useEffect(() => {
     // Keep the bootstrapped color until the real persisted Tauri settings arrive.
     if (!ready) return;
@@ -103,7 +124,7 @@ function App() {
   }, []);
 
   function openSettings(tab: SettingsTab = 'config') {
-    setDraft({ ...snapshot.settings }); setFormError(''); setSettingsTab(tab); setSettingsOpen(true);
+    setDraft({ ...snapshot.settings }); setFormError(''); setThemeError(''); setSettingsTab(tab); setSettingsOpen(true);
     if (tab === 'diagnostics') void loadDiagnostics();
   }
   function chooseTab(tab: SettingsTab) {
@@ -137,7 +158,37 @@ function App() {
     } catch (error) { setReleaseOpenError(`打开下载页面失败：${String(error)}`); }
     finally { setReleaseOpening(false); }
   }
+  async function chooseTheme(value: ThemeChoice) {
+    if (!ready || actionBusy || themeSaveInFlight.current || value === snapshot.settings.theme) return;
+    const previous = snapshot.settings.theme;
+    themeSaveInFlight.current = true;
+    pendingTheme.current = value;
+    setThemeSaving(true);
+    setThemeError('');
+    // Optimistic appearance change: no receiver restart or configuration commit.
+    setSnapshot(current => ({ ...current, settings: { ...current.settings, theme: value } }));
+    try {
+      // Keep the standalone browser UI preview interactive without invoking Tauri.
+      if (isDesktop()) {
+        const updated = await desktop.setTheme(value);
+        pendingTheme.current = null;
+        setSnapshot(updated);
+      } else {
+        pendingTheme.current = null;
+      }
+    } catch (error) {
+      pendingTheme.current = null;
+      setSnapshot(current => ({ ...current, settings: { ...current.settings, theme: previous } }));
+      setThemeError(`主题保存失败：${String(error)}`);
+    } finally {
+      themeSaveInFlight.current = false;
+      setThemeSaving(false);
+    }
+  }
+
   async function saveSettings() {
+    // A receiver configuration save must not overwrite a pending theme write.
+    if (themeSaveInFlight.current) return;
     const problem = validateDeviceName(draft.device_name);
     if (problem) { setFormError(problem); return; }
     const fpsError = validateFps(draft.fps);
@@ -147,7 +198,7 @@ function App() {
     const argsError = validateUxplayArgs(draft.uxplay_args);
     if (argsError) { setFormError(argsError); return; }
     setFormError(''); setActionBusy(true);
-    try { setSnapshot(await desktop.save({ ...draft, device_name: draft.device_name.trim() })); setSettingsOpen(false); }
+    try { setSnapshot(await desktop.save({ ...draft, theme: snapshot.settings.theme, device_name: draft.device_name.trim() })); setSettingsOpen(false); }
     catch (error) { setFormError(String(error)); }
     finally { setActionBusy(false); }
   }
@@ -204,14 +255,19 @@ function App() {
       draft={draft}
       setDraft={setDraft}
       saveSettings={saveSettings}
-      formError={formError}
-      actionBusy={actionBusy}
+      formError={translate(formError, language)}
+      actionBusy={actionBusy || themeSaving}
+      theme={snapshot.settings.theme}
+      themeSaving={themeSaving}
+      themeDisabled={themeSaving || actionBusy || !ready}
+      themeError={themeError}
+      onThemeChange={(value) => void chooseTheme(value)}
       updateResult={updateResult}
       updateChecking={updateChecking}
       runUpdateCheck={runUpdateCheck}
       openRelease={openRelease}
       releaseOpening={releaseOpening}
-      diagnostics={diagnostics}
+      diagnostics={translate(diagnostics, language)}
       loadDiagnostics={loadDiagnostics}
       exportDiagnostics={exportDiagnostics}
       diagnosticsExportStatus={diagnosticsExportStatus}

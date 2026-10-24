@@ -10,7 +10,7 @@ mod windows_job;
 
 use std::{path::PathBuf, sync::Arc};
 use receiver::{Controller, Snapshot};
-use settings::Settings;
+use settings::{Settings, Theme};
 use tauri::{menu::{Menu, MenuItem}, tray::TrayIconBuilder, AppHandle, Manager, RunEvent, WindowEvent};
 
 fn controller(app: &AppHandle) -> Arc<Controller> { app.state::<Arc<Controller>>().inner().clone() }
@@ -19,6 +19,9 @@ fn controller(app: &AppHandle) -> Arc<Controller> { app.state::<Arc<Controller>>
 fn get_snapshot(app: AppHandle) -> Snapshot { controller(&app).snapshot() }
 #[tauri::command]
 fn get_settings(app: AppHandle) -> Settings { controller(&app).settings() }
+// Appearance preference only: never commits unrelated draft receiver settings.
+#[tauri::command]
+fn set_theme(app: AppHandle, theme: Theme) -> Result<Snapshot,String> { controller(&app).set_theme(&app,theme) }
 #[tauri::command]
 fn start_receiving(app: AppHandle) -> Snapshot { controller(&app).start(&app,true) }
 #[tauri::command]
@@ -176,7 +179,7 @@ pub fn run() {
             if should_start { core.start(app.handle(),true); }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_snapshot,open_project_page,get_settings,start_receiving,stop_receiving,retry_receiving,save_settings,get_diagnostics,export_diagnostics,open_release_page])
+        .invoke_handler(tauri::generate_handler![get_snapshot,open_project_page,get_settings,set_theme,start_receiving,stop_receiving,retry_receiving,save_settings,get_diagnostics,export_diagnostics,open_release_page])
         .on_window_event(|window,event| {
             if let WindowEvent::CloseRequested {api,..}=event {
                 let app=window.app_handle();

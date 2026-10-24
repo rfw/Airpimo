@@ -1,3 +1,4 @@
+import { useI18n } from "../lib/i18n-react";
 import { useState, type Dispatch, type SetStateAction } from "react";
 import { ExternalLink, Github, X } from "lucide-react";
 import airpimoIcon from "../../src-tauri/icons/128x128.png";
@@ -22,6 +23,11 @@ interface SettingsDialogProps {
   saveSettings(): Promise<void>;
   formError: string;
   actionBusy: boolean;
+  theme: ThemeChoice;
+  themeSaving: boolean;
+  themeDisabled: boolean;
+  themeError: string;
+  onThemeChange(value: ThemeChoice): void;
   updateResult: ReleaseStatus | null;
   updateChecking: boolean;
   runUpdateCheck(): Promise<void>;
@@ -53,6 +59,11 @@ export function AirpimoSettingsDialog({
                                         saveSettings,
                                         formError,
                                         actionBusy,
+                                        theme,
+                                        themeSaving,
+                                        themeDisabled,
+                                        themeError,
+                                        onThemeChange,
                                         updateResult,
                                         updateChecking,
                                         runUpdateCheck,
@@ -64,6 +75,7 @@ export function AirpimoSettingsDialog({
                                         diagnosticsExportStatus,
                                         diagnosticsExporting,
                                       }: SettingsDialogProps) {
+  const { t, choice, setChoice } = useI18n();
   const { dialogClass, overlayClass } = useDialogPosition();
   // UI-only preference: hiding the editor never resets or disables saved UxPlay args.
   const [showAdvanced, setShowAdvanced] = useState(() => {
@@ -89,14 +101,14 @@ export function AirpimoSettingsDialog({
           <div className="mb-[9px] flex shrink-0 items-start justify-between">
             <div className="flex min-w-0 flex-wrap items-baseline gap-x-[9px] gap-y-1">
               <DialogTitle className="text-[15px] font-[650] leading-[1.3]">
-                设置
+                {t('设置')}
               </DialogTitle>
               <DialogDescription className="mt-1 text-xs text-muted-foreground">
-                Airpimo · 配置与维护
+                {t('Airpimo · 配置与维护')}
               </DialogDescription>
             </div>
             <button
-                aria-label="关闭设置"
+                aria-label={t("关闭设置")}
                 className="inline-flex items-center justify-center border-0 bg-transparent p-1 text-muted-foreground hover:text-foreground"
                 onClick={() => setSettingsOpen(false)}
             >
@@ -107,15 +119,15 @@ export function AirpimoSettingsDialog({
           <div
               className="grid shrink-0 grid-cols-5 gap-1 border-b border-border pb-2"
               role="tablist"
-              aria-label="设置选项卡"
+              aria-label={t("设置选项卡")}
           >
             {(
                 [
-                  ["config", "配置"],
-                  ["theme", "主题"],
-                  ["updates", "升级"],
-                  ["about", "关于"],
-                  ["diagnostics", "诊断"],
+                  ["config", t("配置")],
+                  ["theme", t("界面")],
+                  ["updates", t("升级")],
+                  ["about", t("关于")],
+                  ["diagnostics", t("诊断")],
                 ] as const
             ).map(([value, label]) => (
                 <button
@@ -139,7 +151,7 @@ export function AirpimoSettingsDialog({
               className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden p-0"
               onSubmit={(e) => {
                 e.preventDefault();
-                void saveSettings();
+                if (settingsTab === "config") void saveSettings();
               }}
           >
             <section
@@ -150,7 +162,7 @@ export function AirpimoSettingsDialog({
                 className={panelClasses("config")}
             >
               <label htmlFor="deviceName" className="mb-[5px] block text-xs font-semibold">
-                投屏设备名称
+                {t('投屏设备名称')}
               </label>
               <Input
                   id="deviceName"
@@ -161,17 +173,17 @@ export function AirpimoSettingsDialog({
                   spellCheck={false}
               />
               <p className="my-1 text-[10px] text-muted-foreground">
-                修改设备名称后，重启接收服务生效。
+                {t('修改设备名称后，重启接收服务生效。')}
               </p>
 
               <div className="flex items-center justify-between border-b border-border px-px py-2 [&_strong]:block [&_strong]:text-xs [&_strong]:font-semibold [&_small]:mt-1 [&_small]:block [&_small]:text-[10px] [&_small]:text-muted-foreground">
                 <div>
-                  <strong>最大请求帧率（FPS）</strong>
-                  <small>默认 60，实际帧率由手机决定</small>
+                  <strong>{t('最大请求帧率（FPS）')}</strong>
+                  <small>{t('默认 60，实际帧率由手机决定')}</small>
                 </div>
                 <Input
                     className="!w-[72px] basis-[72px] text-center"
-                    aria-label="最大请求帧率"
+                    aria-label={t("最大请求帧率")}
                     type="number"
                     min={1}
                     max={255}
@@ -183,12 +195,12 @@ export function AirpimoSettingsDialog({
 
               <div className="flex items-center justify-between border-b border-border px-px py-2 [&_strong]:block [&_strong]:text-xs [&_strong]:font-semibold [&_small]:mt-1 [&_small]:block [&_small]:text-[10px] [&_small]:text-muted-foreground items-center gap-2.5">
                 <div className="min-w-0">
-                  <strong>画面亮度</strong>
-                  <small>重启接收服务后生效</small>
+                  <strong>{t('画面亮度')}</strong>
+                  <small>{t('重启接收服务后生效')}</small>
                 </div>
                 <div className="flex basis-[128px] items-center gap-1.5 [&_input]:w-[90px] [&_input]:min-w-0 [&_input]:cursor-pointer [&_input]:accent-primary [&_output]:w-[33px] [&_output]:text-right [&_output]:text-[11px] [&_output]:tabular-nums">
                   <input
-                      aria-label="画面亮度"
+                      aria-label={t("画面亮度")}
                       type="range"
                       min={0}
                       max={100}
@@ -198,17 +210,17 @@ export function AirpimoSettingsDialog({
                           setDraft((x) => ({ ...x, brightness: Number(e.target.value) }))
                       }
                   />
-                  <output aria-label="当前画面亮度">{draft.brightness}%</output>
+                  <output aria-label={t("当前画面亮度")}>{draft.brightness}%</output>
                 </div>
               </div>
 
               <div className="flex items-center justify-between border-b border-border px-px py-2 [&_strong]:block [&_strong]:text-xs [&_strong]:font-semibold [&_small]:mt-1 [&_small]:block [&_small]:text-[10px] [&_small]:text-muted-foreground">
                 <div>
-                  <strong>启动时开启接收</strong>
-                  <small>启动软件时自动开启接收服务</small>
+                  <strong>{t('启动时开启接收')}</strong>
+                  <small>{t('启动软件时自动开启接收服务')}</small>
                 </div>
                 <Switch
-                    aria-label="启动时开启接收"
+                    aria-label={t("启动时开启接收")}
                     checked={draft.auto_start}
                     onCheckedChange={(value) => setDraft((x) => ({ ...x, auto_start: value }))}
                 />
@@ -216,18 +228,18 @@ export function AirpimoSettingsDialog({
 
               <div className="flex items-center justify-between border-b border-border px-px py-2 [&_strong]:block [&_strong]:text-xs [&_strong]:font-semibold [&_small]:mt-1 [&_small]:block [&_small]:text-[10px] [&_small]:text-muted-foreground">
                 <div>
-                  <strong>关闭后驻留托盘</strong>
-                  <small>开启：关闭窗口后隐藏到托盘。关闭：退出软件。</small>
+                  <strong>{t('关闭后驻留托盘')}</strong>
+                  <small>{t('开启：关闭窗口后隐藏到托盘。关闭：退出软件。')}</small>
                 </div>
                 <Switch
-                    aria-label="关闭后驻留托盘"
+                    aria-label={t("关闭后驻留托盘")}
                     checked={draft.stay_in_tray}
                     onCheckedChange={(value) => setDraft((x) => ({ ...x, stay_in_tray: value }))}
                 />
               </div>
 
               <label htmlFor="showAdvanced" className="flex cursor-pointer items-center justify-between border-b border-border px-px py-2">
-                <span className="text-xs font-semibold">高级功能</span>
+                <span className="text-xs font-semibold">{t('高级功能')}</span>
                 <input
                     id="showAdvanced"
                     type="checkbox"
@@ -239,7 +251,7 @@ export function AirpimoSettingsDialog({
 
               {showAdvanced && <div className="mt-[14px] min-w-0 border-t border-border pt-3">
                 <label className="mb-[5px] block text-xs font-semibold" htmlFor="uxplayArgs">
-                  UxPlay 自定义启动参数（高级）
+                  {t('UxPlay 自定义启动参数（高级）')}
                 </label>
                 <textarea
                     id="uxplayArgs"
@@ -247,17 +259,17 @@ export function AirpimoSettingsDialog({
                     rows={3}
                     value={draft.uxplay_args}
                     maxLength={2048}
-                    placeholder="例如：-vol 0.7 -vsync no"
+                    placeholder={t("例如：-vol 0.7 -vsync no")}
                     spellCheck={false}
                     autoCapitalize="off"
                     autoComplete="off"
                     onChange={(e) => setDraft((x) => ({ ...x, uxplay_args: e.target.value }))}
                 />
                 <p className="mb-[5px] mt-2 text-[11px] leading-[1.6] text-destructive" role="note">
-                  非专业人员请勿修改，错误参数可能导致接收失败。保存后需重启接收服务才会生效。
+                  {t('非专业人员请勿修改，错误参数可能导致接收失败。保存后需重启接收服务才会生效。')}
                 </p>
                 <p className="my-1 text-[10px] text-muted-foreground">
-                  优先级：上方设置 ＞ 自定义参数 ＞ 默认参数。支持换行、引号；-vol 可调整音量。
+                  {t('优先级：上方设置 ＞ 自定义参数 ＞ 默认参数。支持换行、引号；-vol 可调整音量。')}
                 </p>
               </div>}
             </section>
@@ -269,35 +281,69 @@ export function AirpimoSettingsDialog({
                 hidden={settingsTab !== "theme"}
                 className={panelClasses("theme")}
             >
-              <p className="my-2 text-[11px] leading-normal text-muted-foreground">
-                选择界面主题。保存后生效。
-              </p>
-              <div
-                  className="mt-2.5 grid grid-cols-3 gap-[3px] rounded-lg border border-border bg-muted p-[3px]"
-                  role="radiogroup"
-                  aria-label="主题"
-              >
-                {(
-                    [
-                      ["system", "跟随系统"],
-                      ["light", "浅色"],
-                      ["dark", "深色"],
-                    ] as const
-                ).map(([value, label]) => (
+              <div>
+                <label className="block text-xs font-semibold" id="airpimo-interface-language-label">
+                  {t("界面语言")}
+                </label>
+                <p className="my-2 text-[11px] leading-normal text-muted-foreground">
+                  {t("选择界面语言，切换后立即生效。")}
+                </p>
+                <div className="mt-2.5 grid grid-cols-3 gap-[3px] rounded-lg border border-border bg-muted p-[3px]" role="radiogroup" aria-labelledby="airpimo-interface-language-label">
+                  {([
+                    ["system", t("跟随系统")],
+                    ["zh-CN", "简体中文"],
+                    ["en", "English"],
+                  ] as const).map(([value, label]) => (
                     <label className="group relative min-w-0 cursor-pointer" key={value}>
                       <input
-                          className="peer sr-only"
-                          type="radio"
-                          name="theme"
-                          value={value}
-                          checked={draft.theme === value}
-                          onChange={() => setDraft((x) => ({ ...x, theme: value as ThemeChoice }))}
+                        className="peer sr-only" type="radio" name="interfaceLanguage"
+                        value={value} checked={choice === value}
+                        onChange={() => setChoice(value)}
                       />
-                      <span className="flex min-h-7 items-center justify-center rounded-[5px] text-[11px] font-medium text-muted-foreground transition-colors duration-150 peer-checked:bg-card peer-checked:text-foreground peer-checked:shadow-[0_1px_3px_rgba(0,0,0,0.08)] peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-1 peer-focus-visible:outline-primary group-hover:text-foreground">
-                    {label}
-                  </span>
+                      <span className="flex min-h-8 items-center justify-center rounded-[5px] text-center text-[11px] font-medium text-muted-foreground transition-colors duration-150 peer-checked:bg-card peer-checked:text-foreground peer-checked:shadow-[0_1px_3px_rgba(0,0,0,0.08)] peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-1 peer-focus-visible:outline-primary group-hover:text-foreground">
+                        {label}
+                      </span>
                     </label>
-                ))}
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-5 border-t border-border pt-4">
+                <label className="block text-xs font-semibold" id="airpimo-appearance-theme-label">
+                  {t("外观主题")}
+                </label>
+                <p className="my-2 text-[11px] leading-normal text-muted-foreground">
+                  {t("选择外观主题，切换后立即生效。")}
+                </p>
+                <div
+                  className="mt-2.5 grid grid-cols-3 gap-[3px] rounded-lg border border-border bg-muted p-[3px]"
+                  role="radiogroup"
+                  aria-labelledby="airpimo-appearance-theme-label"
+                  aria-busy={themeSaving}
+                >
+                  {([
+                    ["system", t("跟随系统")],
+                    ["light", t("浅色")],
+                    ["dark", t("深色")],
+                  ] as const).map(([value, label]) => (
+                    <label className={`group relative min-w-0 ${themeDisabled ? "cursor-wait" : "cursor-pointer"}`} key={value}>
+                      <input
+                        className="peer sr-only"
+                        type="radio"
+                        name="theme"
+                        value={value}
+                        checked={theme === value}
+                        disabled={themeDisabled}
+                        onChange={() => onThemeChange(value)}
+                      />
+                      <span className="flex min-h-8 items-center justify-center rounded-[5px] text-center text-[11px] font-medium text-muted-foreground transition-colors duration-150 peer-checked:bg-card peer-checked:text-foreground peer-checked:shadow-[0_1px_3px_rgba(0,0,0,0.08)] peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-1 peer-focus-visible:outline-primary group-hover:text-foreground peer-disabled:opacity-60">
+                        {label}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+                {themeSaving && <p className="mt-2 text-[10px] text-muted-foreground" role="status">{t("正在保存外观设置…")}</p>}
+                {themeError && <p className="mt-2 text-[11px] text-destructive" role="alert">{t(themeError)}</p>}
               </div>
             </section>
 
@@ -310,7 +356,7 @@ export function AirpimoSettingsDialog({
             >
               <div className="flex items-center justify-between border-b border-border px-px py-2 [&_strong]:block [&_strong]:text-xs [&_strong]:font-semibold [&_small]:mt-1 [&_small]:block [&_small]:text-[10px] [&_small]:text-muted-foreground">
                 <div>
-                  <strong>当前版本</strong>
+                  <strong>{t('当前版本')}</strong>
                   <small>Airpimo v{brand.version}</small>
                 </div>
               </div>
@@ -320,14 +366,14 @@ export function AirpimoSettingsDialog({
                   aria-live="polite"
               >
                 {updateChecking
-                    ? "正在检查更新…"
+                    ? t("正在检查更新…")
                     : !updateResult
-                        ? "尚未检查更新"
+                        ? t("尚未检查更新")
                         : updateResult.kind === "available"
-                            ? `发现新版本 ${updateResult.latest}`
+                            ? `${t("发现新版本")} ${updateResult.latest}`
                             : updateResult.kind === "latest"
-                                ? `已是最新版本（v${updateResult.current}）`
-                                : updateResult.message}
+                                ? `${t("已是最新版本")} (v${updateResult.current})`
+                                : t(updateResult.message)}
               </div>
               <div className="mt-2.5 flex flex-wrap gap-2">
                 <Button
@@ -336,7 +382,7 @@ export function AirpimoSettingsDialog({
                     onClick={() => void runUpdateCheck()}
                     disabled={updateChecking}
                 >
-                  {updateChecking ? "检查中…" : "检查更新"}
+                  {updateChecking ? t("检查中…") : t("检查更新")}
                 </Button>
                 {updateResult?.kind === "available" && (
                     <Button
@@ -344,7 +390,7 @@ export function AirpimoSettingsDialog({
                         onClick={() => void openRelease()}
                         disabled={releaseOpening}
                     >
-                      {releaseOpening ? "打开中…" : "下载"}
+                      {releaseOpening ? t("打开中…") : t("下载")}
                     </Button>
                 )}
               </div>
@@ -358,18 +404,18 @@ export function AirpimoSettingsDialog({
                 className={panelClasses("about")}
             >
               <div className="flex flex-col items-center pb-5 pt-2 text-center">
-                <img src={airpimoIcon} alt="Airpimo 应用图标" className="h-16 w-16 object-contain" />
+                <img src={airpimoIcon} alt={t("Airpimo 应用图标")} className="h-16 w-16 object-contain" />
                 <h2 className="mt-2 text-lg font-semibold tracking-tight">Airpimo</h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">版本 v{brand.version}</p>
-                <p className="mt-3 text-xs text-muted-foreground">轻量、开源的 AirPlay 接收工具</p>
-                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">支持将 iPhone / iPad 屏幕投射到电脑</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{t("版本")} v{brand.version}</p>
+                <p className="mt-3 text-xs text-muted-foreground">{t('轻量、开源的 AirPlay 接收工具')}</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{t('支持将 iPhone / iPad 屏幕投射到电脑')}</p>
               </div>
               <div className="divide-y divide-border border-y border-border">
                 <button
                     type="button"
                     onClick={onProject}
                     className="flex w-full items-center justify-between gap-3 bg-transparent px-px py-3 text-left hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                    aria-label="打开 GitHub 项目主页"
+                    aria-label={t("打开 GitHub 项目主页")}
                 >
                   <span className="flex min-w-0 items-center gap-2.5">
                     <Github size={17} strokeWidth={1.8} aria-hidden="true" />
@@ -381,7 +427,7 @@ export function AirpimoSettingsDialog({
                   <ExternalLink size={14} className="shrink-0 text-muted-foreground" aria-hidden="true" />
                 </button>
                 <div className="flex items-center justify-between gap-3 px-px py-3 text-xs">
-                  <span className="font-semibold">开源协议</span>
+                  <span className="font-semibold">{t('开源协议')}</span>
                   <span className="text-muted-foreground">GPL-3.0-or-later</span>
                 </div>
               </div>
@@ -402,22 +448,22 @@ export function AirpimoSettingsDialog({
                 className="h-[230px] w-full resize-none rounded-lg border border-border bg-muted p-2.5 font-mono text-[11px] leading-[1.55] text-foreground"
                 value={diagnostics}
                 readOnly
-                aria-label="诊断日志"
+                aria-label={t("诊断日志")}
             />
               <div className="mt-3 flex shrink-0 items-center justify-between gap-x-3 gap-y-2">
                 <p className="m-0 min-w-0 flex-[1_1_150px] text-left text-[10px] leading-normal text-muted-foreground">
-                  只记录脱敏状态与错误类别，不采集投屏画面。
+                  {t('只记录脱敏状态与错误类别，不采集投屏画面。')}
                 </p>
                 <div className="flex justify-end gap-[7px]">
                   <Button type="button" variant="outline" onClick={() => void loadDiagnostics()}>
-                    刷新
+                    {t('刷新')}
                   </Button>
                   <Button
                       type="button"
                       onClick={() => void exportDiagnostics()}
                       disabled={diagnosticsExporting}
                   >
-                    {diagnosticsExporting ? "导出中…" : "导出日志"}
+                    {diagnosticsExporting ? t("导出中…") : t("导出日志")}
                   </Button>
                 </div>
               </div>
@@ -425,25 +471,33 @@ export function AirpimoSettingsDialog({
                   <p
                       className={`mt-2 max-h-[44px] shrink-0 overflow-y-auto break-words text-[11px] text-muted-foreground ${diagnosticsExportStatus.startsWith("导出失败") ? "text-destructive" : ""}`}
                       role="status"
-                      title={diagnosticsExportStatus}
+                      title={diagnosticsExportStatus.startsWith("已导出到：")
+                      ? `${t("已导出到")}：${diagnosticsExportStatus.slice("已导出到：".length)}`
+                      : diagnosticsExportStatus.startsWith("导出失败：")
+                        ? `${t("导出失败")}：${diagnosticsExportStatus.slice("导出失败：".length)}`
+                        : t(diagnosticsExportStatus)}
                   >
-                    {diagnosticsExportStatus}
+                    {diagnosticsExportStatus.startsWith("已导出到：")
+                      ? `${t("已导出到")}：${diagnosticsExportStatus.slice("已导出到：".length)}`
+                      : diagnosticsExportStatus.startsWith("导出失败：")
+                        ? `${t("导出失败")}：${diagnosticsExportStatus.slice("导出失败：".length)}`
+                        : t(diagnosticsExportStatus)}
                   </p>
               )}
             </section>
 
-            {formError && (settingsTab === "config" || settingsTab === "theme") && (
+            {formError && settingsTab === "config" && (
                 <div className="mt-[9px] text-[11px] text-[#cf293e]" role="alert">
                   {formError}
                 </div>
             )}
-            {(settingsTab === "config" || settingsTab === "theme") && (
+            {settingsTab === "config" && (
                 <div className="flex shrink-0 justify-end gap-[7px] border-t border-border bg-background px-[18px] pb-1 pt-3">
                   <Button type="button" variant="outline" onClick={() => setSettingsOpen(false)}>
-                    取消
+                    {t('取消')}
                   </Button>
                   <Button type="submit" disabled={actionBusy}>
-                    保存设置
+                    {t('保存设置')}
                   </Button>
                 </div>
             )}
@@ -470,6 +524,7 @@ export function AirpimoUpdateNotice({
                                       releaseOpening,
                                       openRelease,
                                     }: UpdateNoticeProps) {
+  const { t } = useI18n();
   const { dialogMac, overlayClass } = useDialogPosition();
 
   return (
@@ -479,28 +534,30 @@ export function AirpimoUpdateNotice({
             overlayClassName={overlayClass}
         >
           <DialogTitle className="text-[15px] font-[650] leading-[1.3]">
-            发现新版本
+            {t('发现新版本')}
           </DialogTitle>
           <DialogDescription className="mt-2.5 text-xs leading-[1.7] text-muted-foreground">
-            当前版本 v{brand.version}，最新版本{" "}
-            {updateResult?.kind === "available" ? updateResult.latest : ""}。
-            点击「下载」将在浏览器中打开对应的 GitHub Release 下载页。
+            {t("当前版本 v{current}，最新版本 {latest}。", {
+              current: brand.version,
+              latest: updateResult?.kind === "available" ? updateResult.latest : "",
+            })}
+            {" "}{t("点击「下载」将在浏览器中打开对应的 GitHub Release 下载页。")}
           </DialogDescription>
           {releaseOpenError && (
               <p className="mt-[9px] text-[11px] text-[#cf293e]" role="alert">
-                {releaseOpenError}
+                {releaseOpenError.replace("打开下载页面失败", t("打开下载页面失败"))}
               </p>
           )}
           <div className="mt-3 flex justify-end gap-[7px]">
             <Button type="button" variant="outline" onClick={() => setUpdateNoticeOpen(false)}>
-              稍后
+              {t('稍后')}
             </Button>
             <Button
                 type="button"
                 onClick={() => void openRelease()}
                 disabled={releaseOpening || updateResult?.kind !== "available"}
             >
-              {releaseOpening ? "打开中…" : "下载"}
+              {releaseOpening ? t("打开中…") : t("下载")}
             </Button>
           </div>
         </DialogContent>
