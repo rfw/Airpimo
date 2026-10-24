@@ -46,7 +46,7 @@ extern "system" {
     fn CreateJobObjectW(attributes: *const c_void, name: *const u16) -> Handle;
     fn SetInformationJobObject(job: Handle, info_class: i32, info: *const c_void, len: u32) -> i32;
     fn AssignProcessToJobObject(job: Handle, process: Handle) -> i32;
-    fn CloseHandle(handle: Handle) -> i32;
+    fn CloseHandle(handle: isize) -> i32;
 }
 
 pub struct ReceiverJob(Handle);
@@ -71,5 +71,5 @@ impl ReceiverJob {
     }
 }
 impl Drop for ReceiverJob {
-    fn drop(&mut self) { unsafe { CloseHandle(self.0); } }
+    fn drop(&mut self) { unsafe { let _ = CloseHandle(self.0 as isize); } }
 }

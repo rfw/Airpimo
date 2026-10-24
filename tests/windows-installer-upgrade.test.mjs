@@ -11,6 +11,7 @@ const hooks=read('src-tauri/windows/installer-hooks.nsh');
 // do not loosen the anchors or replace all other installer behavior.
 const sample = `!include "utils.nsh"
 !insertmacro CheckIfAppIsRunning
+  ; Compare this installar version with the existing installation
   ; Reinstalling the same version
   \${If} $R0 = 0
     StrCpy $R1 "$(alreadyInstalledLong)"
@@ -35,11 +36,15 @@ test('same-version reinstall cleans first, and upgrade cleanup precedes legacy u
   assert.match(generated,/Goto reinst_uninstall\n    \$\{Else\}\s+; Explicit in-place reinstall\n      Goto reinst_done/);
   assert.match(generated,/reinst_uninstall:\n    ; This is BEFORE running an older uninstaller.*\n    !insertmacro AIRPIMO_STOP_INSTALLED_PROCESSES\n    HideWindow/);
   assert.equal(generated.split('AIRPIMO_STOP_INSTALLED_PROCESSES').length-1,1);
+  assert.match(generated,/A registry-only install cannot run its missing uninstaller/);
+  assert.match(generated,/AndIfNot.*FileExists.*\$R8\\uninstall\.exe/);
+  assert.match(generated,/previous install record exists, but directory is empty/);
 });
 
 test('template preparation fails closed on unexpected Tauri layout',()=>{
   assert.throws(()=>customizeNsis(sample.replace('$(uninstallApp)','$(mutated)')),/template drift: same-version labels/);
   assert.throws(()=>customizeNsis(sample.replace('reinst_uninstall:', 'other_label:')),/template drift: old-uninstaller cleanup/);
+  assert.throws(()=>customizeNsis(sample.replace('; Compare this installar version', '; Modified version')),/template drift: stale-registration bypass/);
   assert.ok(UPSTREAM.includes('tauri-v2.11.1'));
   assert.match(TARGET,/airpimo-installer\.nsi$/);
 });
@@ -61,6 +66,13 @@ test('PowerShell payload matches versioned script and kills only installed path-
   assert.match(hooks,/!macro NSIS_HOOK_PREINSTALL/);
   assert.match(hooks,/!macro NSIS_HOOK_PREUNINSTALL/);
   assert.match(hooks,/SetEnvironmentVariableW/);
+  assert.match(hooks,/No installed executable means a clean or already-removed installation/);
+  assert.match(hooks,/\$INSTDIR\\Airpimo\.exe/);
+  assert.match(hooks,/\$INSTDIR\\sidecar\\uxplay\.exe/);
+  assert.ok(hooks.indexOf('No installed executable') < hooks.indexOf('InitPluginsDir'));
+  assert.match(source,/if \(-not \$hasInstalledExecutable\) \{ exit 0 \}/);
+  assert.match(source,/Airpimo-installer-cleanup\.log/);
+  assert.match(hooks,/Airpimo scoped cleanup failed: exit=\$0/);
   assert.match(hooks,/\$0 != "0"/);
 });
 

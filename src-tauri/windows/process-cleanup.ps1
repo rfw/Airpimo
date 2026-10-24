@@ -9,6 +9,13 @@ $targets = @(
   [IO.Path]::Combine($root, 'sidecar\uxplay.exe'),
   [IO.Path]::Combine($root, 'resources\sidecar\uxplay.exe')
 )
+# A clean install or a previously deleted installation has nothing to stop.
+# Do not require working WMI just to create a new installation directory.
+$hasInstalledExecutable = $false
+foreach ($target in $targets) {
+  if ([IO.File]::Exists($target)) { $hasInstalledExecutable = $true; break }
+}
+if (-not $hasInstalledExecutable) { exit 0 }
 function Get-ScopedProcesses {
   $items = @(Get-WmiObject Win32_Process -Filter "Name='Airpimo.exe' OR Name='uxplay.exe'" -ErrorAction Stop)
   foreach ($item in $items) {
@@ -39,5 +46,12 @@ try {
     if (@(Get-ScopedProcesses).Count -eq 0) { exit 0 }
     Start-Sleep -Milliseconds 250
   }
-} catch { exit 5 }
+} catch {
+  # Distinguish a WMI/script failure from an actual process still running.
+  try {
+    $log = [IO.Path]::Combine([IO.Path]::GetTempPath(), 'Airpimo-installer-cleanup.log')
+    [IO.File]::AppendAllText($log, "$(Get-Date -Format s) root=$root error=$($_.Exception.Message)`r`n")
+  } catch { }
+  exit 5
+}
 exit 5
