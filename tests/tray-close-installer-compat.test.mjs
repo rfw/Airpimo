@@ -19,7 +19,8 @@ test('both platforms share one native main-window close policy, with explicit tr
   assert.match(rust, /if window\.label\(\) != "main" \{ return; \}/);
   assert.match(rust, /WindowEvent::CloseRequested \{api,\.\.\}=event \{[\s\S]*?api\.prevent_close\(\);[\s\S]*?main_window_close_action\(controller\(app\)\.settings\(\)\.stay_in_tray\)/);
   assert.match(rust, /MainWindowCloseAction::HideToTray => \{ let _=window\.hide\(\); \}/);
-  assert.match(rust, /MainWindowCloseAction::Exit => \{ app\.exit\(0\); \}/);
+  assert.match(rust, /MainWindowCloseAction::Exit => request_main_window_exit\(app\.clone\(\)\)/);
+  assert.match(rust, /fn request_main_window_exit\(app: AppHandle\)[\s\S]*?std::thread::spawn\(move \|\| app\.exit\(0\)\)/);
   assert.match(rust, /if let RunEvent::Exit=event \{ controller\(app\)\.stop\(app\); \}/);
 });
 

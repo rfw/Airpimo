@@ -65,7 +65,7 @@ test('pinned NSIS template emits bilingual messages after languages, and old cac
 {{/each}}
 `+'X'.repeat(25100);
   const generated=customizeNsis(sample);
-  assert.match(SIGNATURE,/INSTALLER_V3/);
+  assert.match(SIGNATURE,/INSTALLER_V4/);
   assert.ok(generated.indexOf('!insertmacro MUI_LANGUAGE') < generated.indexOf('LangString airpimoCleanupCreateError'));
   for(const name of ['CreateError','WriteError','LocationError','ProcessError']){
     for(const lang of ['ENGLISH','SIMPCHINESE']){
@@ -73,5 +73,7 @@ test('pinned NSIS template emits bilingual messages after languages, and old cac
     }
   }
   assert.match(generated,/无法停止/);
+  assert.match(generated,/LangString airpimoPreparingUninstall \$\{LANG_ENGLISH\}/);
+  assert.match(generated,/LangString airpimoPreparingUninstall \$\{LANG_SIMPCHINESE\}/);
   assert.throws(()=>customizeNsis(sample.replace('{{#each language_files}}','{{#each broken_language_files}}')),/template drift: localized cleanup messages/);
 });

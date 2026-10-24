@@ -42,7 +42,12 @@ test('same-version reinstall cleans first, and upgrade cleanup precedes legacy u
   assert.match(generated,/StrCpy \$R3 "\$\(addOrReinstall\)"/);
   assert.match(generated,/\$R0 = 0 ; Same version: first \(default\) = clean reinstall/);
   assert.match(generated,/Goto reinst_uninstall\n    \$\{Else\}\s+; Explicit in-place reinstall\n      Goto reinst_done/);
-  assert.match(generated,/reinst_uninstall:\n    ; This is BEFORE running an older uninstaller.*\n    !insertmacro AIRPIMO_STOP_INSTALLED_PROCESSES\n    HideWindow/);
+  const uninstall = generated.split('  reinst_uninstall:')[1].split('    HideWindow')[0];
+  assert.match(uninstall,/Banner::show "\$\(airpimoPreparingUninstall\)"/);
+  assert.match(uninstall,/!insertmacro AIRPIMO_STOP_INSTALLED_PROCESSES/);
+  assert.match(uninstall,/!insertmacro AIRPIMO_DISMISS_PREPARATION_BANNER/);
+  assert.ok(uninstall.indexOf('Banner::show') < uninstall.indexOf('AIRPIMO_STOP_INSTALLED_PROCESSES'));
+  assert.ok(uninstall.indexOf('AIRPIMO_STOP_INSTALLED_PROCESSES') < uninstall.indexOf('AIRPIMO_DISMISS_PREPARATION_BANNER'));
   assert.equal(generated.split('AIRPIMO_STOP_INSTALLED_PROCESSES').length-1,1);
   assert.match(generated,/A registry-only install cannot run its missing uninstaller/);
   assert.match(generated,/AndIfNot.*FileExists.*\$R8\\uninstall\.exe/);

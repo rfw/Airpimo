@@ -1,5 +1,14 @@
 ; NSIS hooks shared by Windows 7 and Windows 10/11.
 ; Source of embedded UTF-16LE script: process-cleanup.ps1 (checked by tests).
+; Banner is shown only for interactive maintenance-page cleanup, not on a
+; normal install/uninstall hook. Avoid calling its plugin when none is open.
+Var AirpimoPreparationBanner
+!macro AIRPIMO_DISMISS_PREPARATION_BANNER
+  ${If} $AirpimoPreparationBanner == "1"
+    Banner::destroy
+    StrCpy $AirpimoPreparationBanner 0
+  ${EndIf}
+!macroend
 !macro AIRPIMO_STOP_INSTALLED_PROCESSES
   ; Scoped to $INSTDIR; no global taskkill /IM uxplay.exe.
   ; No installed executable means a clean or already-removed installation.
@@ -15,6 +24,7 @@
     ClearErrors
     FileOpen $R9 "$PLUGINSDIR\AirpimoCleanup\airpimo-cleanup.ps1" w
     ${If} ${Errors}
+      !insertmacro AIRPIMO_DISMISS_PREPARATION_BANNER
       MessageBox MB_ICONSTOP|MB_OK "$(airpimoCleanupCreateError)"
       Abort
     ${EndIf}
@@ -62,24 +72,25 @@
     FileWriteUTF16LE $R9 "}$\r$\n"
     FileWriteUTF16LE $R9 "try {$\r$\n"
     FileWriteUTF16LE $R9 "  $$running = @(Get-ScopedProcesses)$\r$\n"
+    FileWriteUTF16LE $R9 "  # Do not call CloseMainWindow here: with $\"stay in tray$\" enabled it only$\r$\n"
+    FileWriteUTF16LE $R9 "  # hides Airpimo, wasting time before termination. WMI objects below were$\r$\n"
+    FileWriteUTF16LE $R9 "  # already verified against this exact installation path.$\r$\n"
     FileWriteUTF16LE $R9 "  foreach ($$item in $$running) {$\r$\n"
-    FileWriteUTF16LE $R9 "    if ($$item.Name -ieq 'Airpimo.exe') {$\r$\n"
-    FileWriteUTF16LE $R9 "      $$appProcess = Get-Process -Id ([int]$$item.ProcessId) -ErrorAction SilentlyContinue$\r$\n"
-    FileWriteUTF16LE $R9 "      if ($$null -ne $$appProcess) { $$null = $$appProcess.CloseMainWindow() }$\r$\n"
-    FileWriteUTF16LE $R9 "    }$\r$\n"
-    FileWriteUTF16LE $R9 "  }$\r$\n"
-    FileWriteUTF16LE $R9 "  if ($$running.Count -gt 0) { Start-Sleep -Milliseconds 500 }$\r$\n"
-    FileWriteUTF16LE $R9 "  foreach ($$item in @(Get-ScopedProcesses)) {$\r$\n"
-    FileWriteUTF16LE $R9 "    # Scoped to installation root; exit if access is denied instead of ignoring locks.$\r$\n"
     FileWriteUTF16LE $R9 "    $$result = $$item.Terminate()$\r$\n"
     FileWriteUTF16LE $R9 "    if ($$null -ne $$result -and $$result.ReturnValue -ne 0 -and $$result.ReturnValue -ne 9) {$\r$\n"
     FileWriteUTF16LE $R9 "      throw $\"Terminate failed for PID $$($$item.ProcessId), WMI return code $$($$result.ReturnValue)$\"$\r$\n"
     FileWriteUTF16LE $R9 "    }$\r$\n"
     FileWriteUTF16LE $R9 "  }$\r$\n"
-    FileWriteUTF16LE $R9 "  for ($$attempt = 0; $$attempt -lt 20; $$attempt++) {$\r$\n"
-    FileWriteUTF16LE $R9 "    if (@(Get-ScopedProcesses).Count -eq 0) { exit 0 }$\r$\n"
-    FileWriteUTF16LE $R9 "    Start-Sleep -Milliseconds 250$\r$\n"
+    FileWriteUTF16LE $R9 "  # Wait on the already identified PIDs using native process handles instead$\r$\n"
+    FileWriteUTF16LE $R9 "  # of repeating a costly Win7 WMI query twenty times. Recheck exact paths once$\r$\n"
+    FileWriteUTF16LE $R9 "  # before allowing the old installer's files to be removed.$\r$\n"
+    FileWriteUTF16LE $R9 "  foreach ($$item in $$running) {$\r$\n"
+    FileWriteUTF16LE $R9 "    $$process = Get-Process -Id ([int]$$item.ProcessId) -ErrorAction SilentlyContinue$\r$\n"
+    FileWriteUTF16LE $R9 "    if ($$null -ne $$process) {$\r$\n"
+    FileWriteUTF16LE $R9 "      try { $$null = $$process.WaitForExit(2000) } catch { }$\r$\n"
+    FileWriteUTF16LE $R9 "    }$\r$\n"
     FileWriteUTF16LE $R9 "  }$\r$\n"
+    FileWriteUTF16LE $R9 "  if (@(Get-ScopedProcesses).Count -eq 0) { exit 0 }$\r$\n"
     FileWriteUTF16LE $R9 "  throw $\"Timed out waiting for scoped Airpimo/UxPlay processes to exit$\"$\r$\n"
     FileWriteUTF16LE $R9 "} catch {$\r$\n"
     FileWriteUTF16LE $R9 "  # Distinguish a WMI/script failure from an actual process still running.$\r$\n"
@@ -92,12 +103,14 @@
     FileWriteUTF16LE $R9 "exit 5$\r$\n"
     ${If} ${Errors}
       FileClose $R9
+      !insertmacro AIRPIMO_DISMISS_PREPARATION_BANNER
       MessageBox MB_ICONSTOP|MB_OK "$(airpimoCleanupWriteError)"
       Abort
     ${EndIf}
     FileClose $R9
     System::Call 'kernel32::SetEnvironmentVariableW(w "AIRPIMO_INSTALL_DIR", w "$INSTDIR") i .r0'
     ${If} $0 = 0
+      !insertmacro AIRPIMO_DISMISS_PREPARATION_BANNER
       MessageBox MB_ICONSTOP|MB_OK "$(airpimoCleanupLocationError)"
       Abort
     ${EndIf}
@@ -110,6 +123,7 @@
     RMDir "$PLUGINSDIR\AirpimoCleanup"
     ${If} $0 != "0"
       DetailPrint "Airpimo scoped cleanup failed: exit=$0; output=$1"
+      !insertmacro AIRPIMO_DISMISS_PREPARATION_BANNER
       MessageBox MB_ICONSTOP|MB_OK "$(airpimoCleanupProcessError)"
       Abort
     ${EndIf}

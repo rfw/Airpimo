@@ -25,6 +25,7 @@ interface SettingsDialogProps {
   actionBusy: boolean;
   traySaving: boolean;
   trayError: string;
+  trayPersisted: boolean;
   onTrayPreferenceChange(value: boolean): void;
   theme: ThemeChoice;
   themeSaving: boolean;
@@ -64,6 +65,7 @@ export function AirpimoSettingsDialog({
                                         actionBusy,
                                         traySaving,
                                         trayError,
+                                        trayPersisted,
                                         onTrayPreferenceChange,
                                         theme,
                                         themeSaving,
@@ -248,8 +250,20 @@ export function AirpimoSettingsDialog({
                     onCheckedChange={onTrayPreferenceChange}
                 />
               </div>
-              {traySaving && <p role="status" className="mt-1 text-[10px] text-muted-foreground">{t('正在保存托盘设置…')}</p>}
-              {trayError && <p role="alert" className="mt-1 text-[11px] text-destructive">{t(trayError)}</p>}
+              <p
+                  role={trayError ? "alert" : "status"}
+                  aria-live="polite"
+                  aria-atomic="true"
+                  className={`mt-1 min-h-[15px] text-[10px] leading-[15px] ${trayError ? "text-destructive" : "text-muted-foreground"}`}
+              >
+                {trayError
+                    ? t(trayError)
+                    : traySaving
+                        ? t("正在保存托盘设置…")
+                        : trayPersisted
+                            ? t("设置已保存，无需点击保存设置。")
+                            : t("此选项自动保存，无需点击保存设置。")}
+              </p>
 
               <label htmlFor="showAdvanced" className="flex cursor-pointer items-center justify-between border-b border-border px-px py-2">
                 <span className="text-xs font-semibold">{t('高级功能')}</span>

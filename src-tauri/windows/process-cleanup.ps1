@@ -41,24 +41,25 @@ function Get-ScopedProcesses {
 }
 try {
   $running = @(Get-ScopedProcesses)
+  # Do not call CloseMainWindow here: with "stay in tray" enabled it only
+  # hides Airpimo, wasting time before termination. WMI objects below were
+  # already verified against this exact installation path.
   foreach ($item in $running) {
-    if ($item.Name -ieq 'Airpimo.exe') {
-      $appProcess = Get-Process -Id ([int]$item.ProcessId) -ErrorAction SilentlyContinue
-      if ($null -ne $appProcess) { $null = $appProcess.CloseMainWindow() }
-    }
-  }
-  if ($running.Count -gt 0) { Start-Sleep -Milliseconds 500 }
-  foreach ($item in @(Get-ScopedProcesses)) {
-    # Scoped to installation root; exit if access is denied instead of ignoring locks.
     $result = $item.Terminate()
     if ($null -ne $result -and $result.ReturnValue -ne 0 -and $result.ReturnValue -ne 9) {
       throw "Terminate failed for PID $($item.ProcessId), WMI return code $($result.ReturnValue)"
     }
   }
-  for ($attempt = 0; $attempt -lt 20; $attempt++) {
-    if (@(Get-ScopedProcesses).Count -eq 0) { exit 0 }
-    Start-Sleep -Milliseconds 250
+  # Wait on the already identified PIDs using native process handles instead
+  # of repeating a costly Win7 WMI query twenty times. Recheck exact paths once
+  # before allowing the old installer's files to be removed.
+  foreach ($item in $running) {
+    $process = Get-Process -Id ([int]$item.ProcessId) -ErrorAction SilentlyContinue
+    if ($null -ne $process) {
+      try { $null = $process.WaitForExit(2000) } catch { }
+    }
   }
+  if (@(Get-ScopedProcesses).Count -eq 0) { exit 0 }
   throw "Timed out waiting for scoped Airpimo/UxPlay processes to exit"
 } catch {
   # Distinguish a WMI/script failure from an actual process still running.

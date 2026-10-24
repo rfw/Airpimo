@@ -44,6 +44,7 @@ function App() {
   const themeSaveInFlight = useRef(false);
   const [traySaving, setTraySaving] = useState(false);
   const [trayError, setTrayError] = useState('');
+  const [trayPersisted, setTrayPersisted] = useState(false);
   const traySaveInFlight = useRef(false);
   const pendingTray = useRef<boolean | null>(null);
   // Hide stale native snapshots while an appearance write is pending.
@@ -136,7 +137,7 @@ function App() {
   }, []);
 
   function openSettings(tab: SettingsTab = 'config') {
-    setDraft({ ...snapshot.settings }); setFormError(''); setThemeError(''); setTrayError(''); setSettingsTab(tab); setSettingsOpen(true);
+    setDraft({ ...snapshot.settings }); setFormError(''); setThemeError(''); setTrayError(''); setTrayPersisted(false); setSettingsTab(tab); setSettingsOpen(true);
     if (tab === 'diagnostics') void loadDiagnostics();
   }
   function chooseTab(tab: SettingsTab) {
@@ -205,6 +206,7 @@ function App() {
     pendingTray.current = value;
     setTraySaving(true);
     setTrayError('');
+    setTrayPersisted(false);
     // Update the switch immediately, then commit the one persisted native field.
     setSnapshot(current => ({ ...current, settings: { ...current.settings, stay_in_tray: value } }));
     setDraft(current => ({ ...current, stay_in_tray: value }));
@@ -214,8 +216,10 @@ function App() {
         pendingTray.current = null;
         setSnapshot(updated);
         setDraft(current => ({ ...current, stay_in_tray: updated.settings.stay_in_tray }));
+        setTrayPersisted(true);
       } else {
         pendingTray.current = null;
+        setTrayPersisted(true);
       }
     } catch (error) {
       pendingTray.current = null;
@@ -301,6 +305,7 @@ function App() {
       actionBusy={actionBusy || themeSaving || traySaving}
       traySaving={traySaving}
       trayError={trayError}
+      trayPersisted={trayPersisted}
       onTrayPreferenceChange={(value) => void chooseTrayPreference(value)}
       theme={snapshot.settings.theme}
       themeSaving={themeSaving}

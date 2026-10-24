@@ -35,6 +35,13 @@ enum MainWindowCloseAction { HideToTray, Exit }
 fn main_window_close_action(stay_in_tray: bool) -> MainWindowCloseAction {
     if stay_in_tray { MainWindowCloseAction::HideToTray } else { MainWindowCloseAction::Exit }
 }
+// The close-request callback runs inside the native event loop on macOS.
+// Request a full process exit after the callback returns; attempting app.exit()
+// synchronously while the close event is still being handled can be re-entrant.
+// The existing RunEvent::Exit performs the receiver/child cleanup.
+fn request_main_window_exit(app: AppHandle) {
+    std::thread::spawn(move || app.exit(0));
+}
 #[tauri::command]
 fn start_receiving(app: AppHandle) -> Snapshot { controller(&app).start(&app,true) }
 #[tauri::command]
@@ -201,9 +208,12 @@ pub fn run() {
                 // or the whole app terminates (including its managed receiver job).
                 api.prevent_close();
                 let app=window.app_handle();
-                match main_window_close_action(controller(app).settings().stay_in_tray) {
+                let action = main_window_close_action(controller(app).settings().stay_in_tray);
+                // Visible in `npm run tauri dev` logs when diagnosing macOS close behavior.
+                eprintln!("Airpimo main-window close policy: {action:?}");
+                match action {
                     MainWindowCloseAction::HideToTray => { let _=window.hide(); },
-                    MainWindowCloseAction::Exit => { app.exit(0); },
+                    MainWindowCloseAction::Exit => request_main_window_exit(app.clone()),
                 }
             }
         })

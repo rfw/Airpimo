@@ -9,7 +9,7 @@ import {pathToFileURL} from 'node:url';
 
 export const UPSTREAM = 'https://raw.githubusercontent.com/tauri-apps/tauri/tauri-v2.11.1/crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi';
 export const TARGET = resolve(import.meta.dirname, '../src-tauri/windows/airpimo-installer.nsi');
-export const SIGNATURE = '; AIRPIMO_CUSTOM_TAURI_2_11_1_INSTALLER_V3';
+export const SIGNATURE = '; AIRPIMO_CUSTOM_TAURI_2_11_1_INSTALLER_V4';
 function replaceOnce(source, before, after, label) {
   const count = source.split(before).length - 1;
   if(count !== 1) throw Error(`Pinned Tauri NSIS template drift: ${label} (${count} matches)`);
@@ -79,7 +79,9 @@ LangString airpimoCleanupWriteError \${LANG_SIMPCHINESE} "无法写入 Airpimo �
 LangString airpimoCleanupLocationError \${LANG_ENGLISH} "Airpimo could not verify the install location. Close the installer."
 LangString airpimoCleanupLocationError \${LANG_SIMPCHINESE} "无法验证 Airpimo 的安装位置，请关闭安装程序。"
 LangString airpimoCleanupProcessError \${LANG_ENGLISH} "Unable to stop Airpimo processes in $INSTDIR. Close Airpimo and Airpimo Player and retry."
-LangString airpimoCleanupProcessError \${LANG_SIMPCHINESE} "无法停止 $INSTDIR 中的 Airpimo 进程。请关闭 Airpimo 和 Airpimo Player 后重试。"`,
+LangString airpimoCleanupProcessError \${LANG_SIMPCHINESE} "无法停止 $INSTDIR 中的 Airpimo 进程。请关闭 Airpimo 和 Airpimo Player 后重试。"
+LangString airpimoPreparingUninstall \${LANG_ENGLISH} "Stopping Airpimo and preparing the previous version for removal..."
+LangString airpimoPreparingUninstall \${LANG_SIMPCHINESE} "正在关闭 Airpimo 并准备卸载旧版本，请稍候…"`,
     'localized cleanup messages');
   // Tauri's first radio is checked by default; on upgrade it already means
   // uninstall-before-install. The above aligns same-version repairs with it.
@@ -87,8 +89,18 @@ LangString airpimoCleanupProcessError \${LANG_SIMPCHINESE} "无法停止 $INSTDI
 `  reinst_uninstall:
     HideWindow`,
 `  reinst_uninstall:
+    ; A synchronous PowerShell/WMI check is slow on Win7 and formerly froze
+    ; the maintenance page after Next was clicked. Show NSIS' built-in banner
+    ; BEFORE the check, then remove it before the old uninstaller opens.
+    \${If} $PassiveMode != 1
+      Banner::show "$(airpimoPreparingUninstall)"
+      StrCpy $AirpimoPreparationBanner 1
+    \${EndIf}
     ; This is BEFORE running an older uninstaller without our safety hooks.
     !insertmacro AIRPIMO_STOP_INSTALLED_PROCESSES
+    \${If} $PassiveMode != 1
+      !insertmacro AIRPIMO_DISMISS_PREPARATION_BANNER
+    \${EndIf}
     HideWindow`, 'old-uninstaller cleanup');
   return SIGNATURE + '\n; Derived from tauri-v2.11.1, preserving original handlebars placeholders.\n' + s;
 }
