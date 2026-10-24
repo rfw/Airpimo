@@ -44,3 +44,19 @@ test('distinct build outputs are preserved without touching the original NSIS fi
     assert.throws(()=>preserveNsisInstaller(temp,'unknown'));
   } finally {rmSync(temp,{recursive:true,force:true})}
 });
+
+
+test('RC Windows installer candidate keeps existing Windows 10/11 name and includes prerelease version',()=> {
+  const temp=mkdtempSync(join(tmpdir(),'airpimo-win-rc-'));
+  try {
+    writeFileSync(join(temp,'package.json'),JSON.stringify({version:'0.1.0-rc.3'}));
+    const nsis=join(temp,'src-tauri','target','release','bundle','nsis');
+    mkdirSync(nsis,{recursive:true});
+    writeFileSync(join(nsis,'Airpimo_0.1.0-rc.3_x64-setup.exe'),'fixture');
+    const win7=preserveNsisInstaller(temp,'win7');
+    const modern=preserveNsisInstaller(temp,'win10plus');
+    assert.equal(win7,join(temp,'release-installers','win7','Airpimo_0.1.0-rc.3_x64-setup-win7.exe'));
+    assert.equal(modern,join(temp,'release-installers','win10plus','Airpimo_0.1.0-rc.3_windows10-11-x64.exe'));
+    assert.ok(existsSync(win7) && existsSync(modern));
+  }finally {rmSync(temp,{recursive:true,force:true});}
+});

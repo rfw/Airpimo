@@ -47,6 +47,18 @@ test('pinned NSIS template emits bilingual messages after languages, and old cac
     StrCpy $R1 "$(alreadyInstalledLong)"
     StrCpy $R2 "$(addOrReinstall)"
     StrCpy $R3 "$(uninstallApp)"
+    \${NSD_CreateRadioButton} 30u 70u -30u 8u $R3
+    Pop $R3
+    ; Disable this radio button if downgrading and downgrades are disabled
+    !if "\${ALLOWDOWNGRADES}" == "false"
+      \${IfThen} $R0 = -1 \${|} EnableWindow $R3 0 \${|}
+    !endif
+    \${NSD_OnClick} $R3 PageReinstallUpdateSelection
+    \${If} $ReinstallPageCheck <> 2
+      SendMessage $R2 \${BM_SETCHECK} \${BST_CHECKED} 0
+    \${Else}
+      SendMessage $R3 \${BM_SETCHECK} \${BST_CHECKED} 0
+    \${EndIf}
   \${If} $R0 = 0 ; Same version, proceed
     \${If} $R1 = 1              ; User chose to add/reinstall
       Goto reinst_done
@@ -63,12 +75,32 @@ test('pinned NSIS template emits bilingual messages after languages, and old cac
 {{#each language_files}}
   !include "{{this}}"
 {{/each}}
+; Use show readme button as desktop shortcut
+!define MUI_FINISHPAGE_SHOWREADME_FUNCTION CreateOrUpdateDesktopShortcut
+; Show run app after installation.
+!define MUI_FINISHPAGE_RUN
+!define MUI_FINISHPAGE_RUN_FUNCTION RunMainBinary
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+!insertmacro MUI_PAGE_FINISH
 Function RunMainBinary
   nsis_tauri_utils::RunAsUser "$INSTDIR\\\${MAINBINARYNAME}.exe" ""
 FunctionEnd
+; Uninstaller Pages
+Function .onInstSuccess
+  ; Check for /R flag only in silent and passive installers because
+  ; GUI installer has a toggle for the user to (re)start the app
+  \${If} $PassiveMode = 1
+  \${OrIf} \${Silent}
+    \${GetOptions} $CMDLINE "/R" $R0
+    \${IfNot} \${Errors}
+      \${GetOptions} $CMDLINE "/ARGS" $R0
+      nsis_tauri_utils::RunAsUser "$INSTDIR\\\${MAINBINARYNAME}.exe" "$R0"
+    \${EndIf}
+  \${EndIf}
+FunctionEnd
 `+'X'.repeat(25100);
   const generated=customizeNsis(sample);
-  assert.match(SIGNATURE,/INSTALLER_V5/);
+  assert.match(SIGNATURE,/INSTALLER_V10/);
   assert.ok(generated.indexOf('!insertmacro MUI_LANGUAGE') < generated.indexOf('LangString airpimoCleanupCreateError'));
   for(const name of ['CreateError','WriteError','LocationError','ProcessError']){
     for(const lang of ['ENGLISH','SIMPCHINESE']){

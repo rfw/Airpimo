@@ -5,11 +5,12 @@
 import {readFileSync, writeFileSync, existsSync, mkdirSync} from 'node:fs';
 import {resolve, dirname} from 'node:path';
 import https from 'node:https';
+import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
 export const UPSTREAM = 'https://raw.githubusercontent.com/tauri-apps/tauri/tauri-v2.11.1/crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi';
 export const TARGET = resolve(import.meta.dirname, '../src-tauri/windows/airpimo-installer.nsi');
-export const SIGNATURE = '; AIRPIMO_CUSTOM_TAURI_2_11_1_INSTALLER_V6';
+export const SIGNATURE = '; AIRPIMO_CUSTOM_TAURI_2_11_1_INSTALLER_V10';
 function replaceOnce(source, before, after, label) {
   const count = source.split(before).length - 1;
   if(count !== 1) throw Error(`Pinned Tauri NSIS template drift: ${label} (${count} matches)`);
@@ -18,7 +19,8 @@ function replaceOnce(source, before, after, label) {
 export function customizeNsis(upstream) {
   if(upstream.length < 25000 || !upstream.includes('!include "utils.nsh"') ||
     !upstream.includes('!insertmacro CheckIfAppIsRunning')) throw Error('Not the expected Tauri 2.11.1 NSIS source');
-  let s = upstream;
+  // Normalize upstream line endings before anchored, fail-closed replacements.
+  let s = upstream.replace(/\r\n/g, '\n');
   // Tauri's maintenance page is registry-driven, even after manual removal.
   // When only its stale registration remains (no files at the recorded path),
   // skip the maintenance page and perform a normal installation. Never delete
@@ -43,11 +45,11 @@ export function customizeNsis(upstream) {
     StrCpy $R1 "$(alreadyInstalledLong)"
     StrCpy $R2 "$(addOrReinstall)"
     StrCpy $R3 "$(uninstallApp)"`,
-`  ; Same version: default clean REINSTALL, not uninstall-only.
+`  ; Same version: only offer uninstall-before-reinstall.
   \${If} $R0 = 0
     StrCpy $R1 "$(alreadyInstalledLong)"
     StrCpy $R2 "$(uninstallBeforeInstalling)"
-    StrCpy $R3 "$(addOrReinstall)"`, 'same-version labels');
+    StrCpy $R3 ""`, 'same-version labels');
   s = replaceOnce(s,
 `  \${If} $R0 = 0 ; Same version, proceed
     \${If} $R1 = 1              ; User chose to add/reinstall
@@ -55,12 +57,41 @@ export function customizeNsis(upstream) {
     \${Else}                    ; User chose to uninstall
       Goto reinst_uninstall
     \${EndIf}`, 
-`  \${If} $R0 = 0 ; Same version: first (default) = clean reinstall
-    \${If} $R1 = 1
-      Goto reinst_uninstall
-    \${Else}                    ; Explicit in-place reinstall
-      Goto reinst_done
-    \${EndIf}`, 'same-version action');
+`  \${If} $R0 = 0 ; Same version: always uninstall before reinstall
+    Goto reinst_uninstall`, 'same-version action');
+  // Only same-version installs hide the in-place reinstall radio option.
+  // Upgrade/downgrade retain the second choice and its original safety gates.
+  s = replaceOnce(s,
+`    \${NSD_CreateRadioButton} 30u 70u -30u 8u $R3
+    Pop $R3
+    ; Disable this radio button if downgrading and downgrades are disabled
+    !if "\${ALLOWDOWNGRADES}" == "false"
+      \${IfThen} $R0 = -1 \${|} EnableWindow $R3 0 \${|}
+    !endif
+    \${NSD_OnClick} $R3 PageReinstallUpdateSelection`,
+`    \${If} $R0 <> 0
+      \${NSD_CreateRadioButton} 30u 70u -30u 8u $R3
+      Pop $R3
+      ; Disable this radio button if downgrading and downgrades are disabled
+      !if "\${ALLOWDOWNGRADES}" == "false"
+        \${IfThen} $R0 = -1 \${|} EnableWindow $R3 0 \${|}
+      !endif
+      \${NSD_OnClick} $R3 PageReinstallUpdateSelection
+    \${EndIf}`, 'maintenance second option');
+  s = replaceOnce(s,
+`    \${If} $ReinstallPageCheck <> 2
+      SendMessage $R2 \${BM_SETCHECK} \${BST_CHECKED} 0
+    \${Else}
+      SendMessage $R3 \${BM_SETCHECK} \${BST_CHECKED} 0
+    \${EndIf}`,
+`    ; Force clean reinstall for same version, including when navigating Back.
+    \${If} $R0 = 0
+      SendMessage $R2 \${BM_SETCHECK} \${BST_CHECKED} 0
+    \${ElseIf} $ReinstallPageCheck <> 2
+      SendMessage $R2 \${BM_SETCHECK} \${BST_CHECKED} 0
+    \${Else}
+      SendMessage $R3 \${BM_SETCHECK} \${BST_CHECKED} 0
+    \${EndIf}`, 'maintenance default selection');
   // Tauri emits MUI_LANGUAGE and its own language files here. Declare our
   // hook messages AFTER MUI_LANGUAGE, not in the early-included hooks file.
   // The locked template must contain the precise anchor or packaging fails.
@@ -103,21 +134,57 @@ LangString airpimoPreparingUninstall \${LANG_SIMPCHINESE} "正在关闭 Airpimo 
       !insertmacro AIRPIMO_DISMISS_PREPARATION_BANNER
     \${EndIf}
     HideWindow`, 'old-uninstaller cleanup');
-  // Airpimo is started manually. Remove the run checkbox and callback,
-  // but leave the normal finish page, desktop-shortcut option and install
-  // lifecycle unchanged. Pin this to the upstream Tauri 2.11.1 template.
-  s = replaceOnce(s,
-`; Show run app after installation.
-!define MUI_FINISHPAGE_RUN
-!define MUI_FINISHPAGE_RUN_FUNCTION RunMainBinary
-!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
-!insertmacro MUI_PAGE_FINISH
-Function RunMainBinary
-  nsis_tauri_utils::RunAsUser "$INSTDIR\\\${MAINBINARYNAME}.exe" ""
-FunctionEnd`,
-`; Airpimo: start from the Start menu or desktop shortcut after installing.
-!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
-!insertmacro MUI_PAGE_FINISH`, 'finish-page auto-launch removal');
+  // Preserve Tauri 2.11.1 finish-page and silent /R launch behavior unchanged.
+  // Validate both code paths to guard against upstream template drift.
+  const unique = (pattern, label) => {
+    const found = [...s.matchAll(pattern)];
+    if (found.length !== 1) {
+      throw Error(`Pinned Tauri NSIS template drift: finish-page auto-launch removal (${label}=${found.length}; expected 1)`);
+    }
+    return found[0];
+  };
+  const runOption = unique(/^[ \t]*!define[ \t]+MUI_FINISHPAGE_RUN[ \t]*(?:;[^\n]*)?$/gm, 'run option');
+  const runCallback = unique(/^[ \t]*!define[ \t]+MUI_FINISHPAGE_RUN_FUNCTION[ \t]+RunMainBinary[ \t]*(?:;[^\n]*)?$/gm, 'run callback');
+  const finishPage = unique(/^[ \t]*!insertmacro[ \t]+MUI_PAGE_FINISH[ \t]*(?:;[^\n]*)?$/gm, 'finish page');
+  const shortcutCallback = unique(/^[ \t]*!define[ \t]+MUI_FINISHPAGE_SHOWREADME_FUNCTION[ \t]+CreateOrUpdateDesktopShortcut[ \t]*(?:;[^\n]*)?$/gm, 'shortcut callback');
+  const runHandler = unique(/^[ \t]*Function[ \t]+RunMainBinary[ \t]*(?:;[^\n]*)?\n([\s\S]*?)^[ \t]*FunctionEnd[ \t]*(?:;[^\n]*)?$/gm, 'run handler');
+  const uninstallPages = unique(/^[ \t]*; Uninstaller Pages[ \t]*$/gm, 'uninstaller boundary');
+  // Tauri 2.11.1 has a SECOND launch path: .onInstSuccess handles /R for
+  // silent/passive installations. Removing the finish-page checkbox alone
+  // leaves RunAsUser in the template, which correctly trips the drift guard.
+  // Validate the entire callback before removing it; do not silently remove
+  // any new upstream post-install behavior if Tauri changes in the future.
+  const onInstSuccess = unique(/^[ \t]*Function[ \t]+\.onInstSuccess[ \t]*(?:;[^\n]*)?\n([\s\S]*?)^[ \t]*FunctionEnd[ \t]*(?:;[^\n]*)?$/gm, 'silent/passive run handler');
+  if (!(shortcutCallback.index < runOption.index &&
+        runOption.index < runCallback.index &&
+        runCallback.index < finishPage.index &&
+        finishPage.index < runHandler.index &&
+        runHandler.index < uninstallPages.index &&
+        uninstallPages.index < onInstSuccess.index)) {
+    throw Error('Pinned Tauri NSIS template drift: auto-launch removal (invalid page/function order)');
+  }
+  const strippedSuccess = onInstSuccess[1].split('\n').map(line => line.trim())
+    .filter(line => line.length > 0 && !line.startsWith(';'));
+  const expectedSuccess = [
+    '${If} $PassiveMode = 1',
+    '${OrIf} ${Silent}',
+    '${GetOptions} $CMDLINE "/R" $R0',
+    '${IfNot} ${Errors}',
+    '${GetOptions} $CMDLINE "/ARGS" $R0',
+    'nsis_tauri_utils::RunAsUser "$INSTDIR\\${MAINBINARYNAME}.exe" "$R0"',
+    '${EndIf}',
+    '${EndIf}'
+  ];
+  if (JSON.stringify(strippedSuccess) !== JSON.stringify(expectedSuccess)) {
+    throw Error('Pinned Tauri NSIS template drift: auto-launch removal (unexpected .onInstSuccess body)');
+  }
+  const handlerLines = runHandler[1].split('\n').map(line => line.trim()).filter(Boolean);
+  if (handlerLines.length !== 1 ||
+      !/^nsis_tauri_utils::RunAsUser[ \t]+"\$INSTDIR\\\$\{MAINBINARYNAME\}\.exe"[ \t]+""(?:[ \t]*;[^\n]*)?$/.test(handlerLines[0])) {
+    throw Error('Pinned Tauri NSIS template drift: finish-page auto-launch removal (unexpected RunMainBinary body)');
+  }
+  // Leave the verified RunMainBinary and .onInstSuccess functions intact.
+  // No Win7-specific launch handling or error popups.
   return SIGNATURE + '\n; Derived from tauri-v2.11.1, preserving original handlebars placeholders.\n' + s;
 }
 function download(url, redirect = 0) {
@@ -134,11 +201,19 @@ function download(url, redirect = 0) {
 export async function prepareWindowsNsis({platform=process.platform,target=TARGET,sourcePath=process.env.AIRPIMO_TAURI_NSIS_TEMPLATE_SOURCE}={}) {
   if(platform!=='win32') return false;
   if(existsSync(target) && readFileSync(target,'utf8').startsWith(SIGNATURE)) {
-    if (!readFileSync(target,'utf8').includes('AIRPIMO_STOP_INSTALLED_PROCESSES') || !readFileSync(target,'utf8').includes('!insertmacro MUI_PAGE_FINISH') || readFileSync(target,'utf8').includes('MUI_FINISHPAGE_RUN')) throw Error('Generated NSIS template is incomplete');
+    const cached = readFileSync(target,'utf8');
+    if (!cached.includes('AIRPIMO_STOP_INSTALLED_PROCESSES') || !cached.includes('!insertmacro MUI_PAGE_FINISH') || !cached.includes('!define MUI_FINISHPAGE_RUN') || !cached.includes('Function RunMainBinary') || !cached.includes('Function .onInstSuccess') || !cached.includes('Same version: always uninstall before reinstall') || !cached.includes('\${If} $R0 <> 0')) throw Error('Generated NSIS template is incomplete');
     return false;
   }
   const source=sourcePath?readFileSync(sourcePath,'utf8'):await download(UPSTREAM);
-  const generated=customizeNsis(source);
+  if (/^; AIRPIMO_CUSTOM_TAURI_2_11_1_INSTALLER_V\d+/m.test(source)) {
+    throw Error('NSIS template source is already customized; AIRPIMO_TAURI_NSIS_TEMPLATE_SOURCE must point to the original pinned Tauri installer.nsi');
+  }
+  const digest=createHash('sha256').update(source).digest('hex');
+  console.log(`[nsis] Template input: ${sourcePath ?? UPSTREAM}; SHA-256=${digest}`);
+  let generated;
+  try { generated=customizeNsis(source); }
+  catch (error) { throw Error(`${error.message}; source SHA-256=${digest}; ${sourcePath ? `offline source=${sourcePath}` : 'pinned upstream source'}`); }
   mkdirSync(dirname(target),{recursive:true});writeFileSync(target,generated);
   console.log(`[nsis] Tauri 2.11.1 template prepared: ${target}`);
   return true;

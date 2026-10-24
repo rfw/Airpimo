@@ -15,6 +15,18 @@ const sourceSample = `!include "utils.nsh"
     StrCpy $R1 "$(alreadyInstalledLong)"
     StrCpy $R2 "$(addOrReinstall)"
     StrCpy $R3 "$(uninstallApp)"
+    \${NSD_CreateRadioButton} 30u 70u -30u 8u $R3
+    Pop $R3
+    ; Disable this radio button if downgrading and downgrades are disabled
+    !if "\${ALLOWDOWNGRADES}" == "false"
+      \${IfThen} $R0 = -1 \${|} EnableWindow $R3 0 \${|}
+    !endif
+    \${NSD_OnClick} $R3 PageReinstallUpdateSelection
+    \${If} $ReinstallPageCheck <> 2
+      SendMessage $R2 \${BM_SETCHECK} \${BST_CHECKED} 0
+    \${Else}
+      SendMessage $R3 \${BM_SETCHECK} \${BST_CHECKED} 0
+    \${EndIf}
   \${If} $R0 = 0 ; Same version, proceed
     \${If} $R1 = 1              ; User chose to add/reinstall
       Goto reinst_done
@@ -31,8 +43,28 @@ const sourceSample = `!include "utils.nsh"
 {{#each language_files}}
   !include "{{this}}"
 {{/each}}
+; Use show readme button as desktop shortcut
+!define MUI_FINISHPAGE_SHOWREADME_FUNCTION CreateOrUpdateDesktopShortcut
+; Show run app after installation.
+!define MUI_FINISHPAGE_RUN
+!define MUI_FINISHPAGE_RUN_FUNCTION RunMainBinary
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+!insertmacro MUI_PAGE_FINISH
 Function RunMainBinary
   nsis_tauri_utils::RunAsUser "$INSTDIR\\\${MAINBINARYNAME}.exe" ""
+FunctionEnd
+; Uninstaller Pages
+Function .onInstSuccess
+  ; Check for /R flag only in silent and passive installers because
+  ; GUI installer has a toggle for the user to (re)start the app
+  \${If} $PassiveMode = 1
+  \${OrIf} \${Silent}
+    \${GetOptions} $CMDLINE "/R" $R0
+    \${IfNot} \${Errors}
+      \${GetOptions} $CMDLINE "/ARGS" $R0
+      nsis_tauri_utils::RunAsUser "$INSTDIR\\\${MAINBINARYNAME}.exe" "$R0"
+    \${EndIf}
+  \${EndIf}
 FunctionEnd
 ` + 'X'.repeat(25100);
 
@@ -64,7 +96,7 @@ test('Win7 maintenance action shows preparation banner before synchronous cleanu
   const generated = customizeNsis(sourceSample);
   const hooks = read('src-tauri/windows/installer-hooks.nsh');
   const phase = generated.split('  reinst_uninstall:')[1].split('    HideWindow')[0];
-  assert.match(SIGNATURE, /INSTALLER_V5/);
+  assert.match(SIGNATURE, /INSTALLER_V10/);
   assert.ok(phase.indexOf('Banner::show') < phase.indexOf('!insertmacro AIRPIMO_STOP_INSTALLED_PROCESSES'));
   assert.ok(phase.indexOf('!insertmacro AIRPIMO_STOP_INSTALLED_PROCESSES') < phase.indexOf('!insertmacro AIRPIMO_DISMISS_PREPARATION_BANNER'));
   assert.match(generated, /LangString airpimoPreparingUninstall \$\{LANG_SIMPCHINESE\}/);

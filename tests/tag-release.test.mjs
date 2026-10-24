@@ -24,11 +24,43 @@ function makeFour(input){
 }
 test('stable and prerelease tags must match all three project versions',()=>{
   assert.equal(verifyReleaseTag(currentTag,root),currentVersion);
-  assert.equal(verifyReleaseTag(`${currentTag}-rc.1`,root),currentVersion);
+  assert.equal(verifyReleaseTag(`${currentTag}-rc.1`,root),`${currentVersion}-rc.1`);
   for(const tag of ['main','vlatest','v999.999.999','v0.1','v01.2.3','v0.1.4/drop']){
     assert.throws(()=>verifyReleaseTag(tag,root),/BLOCKED/);
   }
 });
+test('RC tag is preserved in all four filenames without changing platform labels',()=>fixture(async dir=>{
+  const input=join(dir,'input'),out=join(dir,'release');makeFour(input);
+  const tag=`${currentTag}-rc.3`;
+  const assets=await prepareReleaseAssets({tag,input,out,projectRoot:root});
+  assert.deepEqual(assets.map(({name})=>name),[
+    `Airpimo_${currentVersion}-rc.3_windows7-x64.exe`,
+    `Airpimo_${currentVersion}-rc.3_windows10-11-x64.exe`,
+    `Airpimo_${currentVersion}-rc.3_macos-intel-x64.dmg`,
+    `Airpimo_${currentVersion}-rc.3_macos-arm64.dmg`,
+  ]);
+  const manifest=JSON.parse(readFileSync(join(out,'release-provenance.json'),'utf8'));
+  assert.equal(manifest.tag,tag);
+  assert.equal(manifest.version,`${currentVersion}-rc.3`);
+  assert.deepEqual(manifest.artifacts.map(({name})=>name),assets.map(({name})=>name));
+  assert.deepEqual(readFileSync(join(out,'SHA256SUMS.txt'),'utf8').trim().split('\n').map(x=>x.split('  ')[1]),assets.map(({name})=>name));
+}));
+
+test('release tag validation allows matching RC project metadata but rejects a different RC or mixed project versions',()=>fixture(dir=>{
+  const project=join(dir,'project'),tauri=join(project,'src-tauri');mkdirSync(tauri,{recursive:true});
+  const writeVersions=(packageVersion,tauriVersion,cargoVersion)=>{
+    writeFileSync(join(project,'package.json'),JSON.stringify({version:packageVersion}));
+    writeFileSync(join(tauri,'tauri.conf.json'),JSON.stringify({version:tauriVersion}));
+    writeFileSync(join(tauri,'Cargo.toml'),`[package]\nversion = "${cargoVersion}"\n`);
+  };
+  writeVersions('0.1.0-rc.3','0.1.0-rc.3','0.1.0-rc.3');
+  assert.equal(verifyReleaseTag('v0.1.0-rc.3',project),'0.1.0-rc.3');
+  assert.throws(()=>verifyReleaseTag('v0.1.0-rc.4',project),/does not match/);
+  assert.throws(()=>verifyReleaseTag('v0.1.0',project),/does not match/);
+  writeVersions('0.1.0','0.1.0-rc.3','0.1.0');
+  assert.throws(()=>verifyReleaseTag('v0.1.0-rc.3',project),/Project versions differ/);
+}));
+
 test('one complete four-platform release generates unique assets and digest list',()=>fixture(async dir=>{
   const input=join(dir,'input'),out=join(dir,'release');makeFour(input);
   const assets=await prepareReleaseAssets({tag:currentTag,input,out,projectRoot:root,sourceCommit:'a'.repeat(40)});

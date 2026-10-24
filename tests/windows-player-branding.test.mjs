@@ -57,15 +57,16 @@ test('both Windows installer entry points brand before running full integrity ga
  const generic=JSON.parse(readFileSync(join(root,'package.json'),'utf8')).scripts['desktop:build'];
  assert.match(generic,/brand-windows-player.mjs --if-windows/);
 });
-test('installer cleanup recognises new and old engine filenames with scoped paths',()=>{
+test('installer cleanup only targets current AirpimoPlayer and never legacy uxplay binaries',()=>{
  const root=resolve(import.meta.dirname,'..');
  const script=readFileSync(join(root,'src-tauri/windows/process-cleanup.ps1'),'utf8');
  const hooks=readFileSync(join(root,'src-tauri/windows/installer-hooks.nsh'),'utf8');
- for(const filename of [SOURCE,BRANDED]) {
-   assert.ok(script.includes(`sidecar\\${filename}`));
-   assert.ok(hooks.includes(`sidecar\\${filename}`));
-   assert.ok(script.includes(`Name='${filename}'`));
-   assert.ok(hooks.includes(`Name='${filename}'`));
+ for(const data of [script,hooks]) {
+   assert.match(data,/sidecar\\AirpimoPlayer\.exe/);
+   assert.match(data,/resources\\sidecar\\AirpimoPlayer\.exe/);
+   assert.match(data,/Name='AirpimoPlayer\.exe'/);
+   assert.match(data,/Airpimo\.exe/);
+   assert.doesNotMatch(data,/sidecar\\uxplay\.exe|Name='uxplay\.exe'|ProcessName -ieq 'uxplay'/i);
  }
  assert.match(script,/OrdinalIgnoreCase/);
  assert.doesNotMatch(script,/taskkill|Stop-Process -Name/i);

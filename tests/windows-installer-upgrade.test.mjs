@@ -17,6 +17,18 @@ const sample = `!include "utils.nsh"
     StrCpy $R1 "$(alreadyInstalledLong)"
     StrCpy $R2 "$(addOrReinstall)"
     StrCpy $R3 "$(uninstallApp)"
+    \${NSD_CreateRadioButton} 30u 70u -30u 8u $R3
+    Pop $R3
+    ; Disable this radio button if downgrading and downgrades are disabled
+    !if "\${ALLOWDOWNGRADES}" == "false"
+      \${IfThen} $R0 = -1 \${|} EnableWindow $R3 0 \${|}
+    !endif
+    \${NSD_OnClick} $R3 PageReinstallUpdateSelection
+    \${If} $ReinstallPageCheck <> 2
+      SendMessage $R2 \${BM_SETCHECK} \${BST_CHECKED} 0
+    \${Else}
+      SendMessage $R3 \${BM_SETCHECK} \${BST_CHECKED} 0
+    \${EndIf}
   \${If} $R0 = 0 ; Same version, proceed
     \${If} $R1 = 1              ; User chose to add/reinstall
       Goto reinst_done
@@ -33,18 +45,41 @@ const sample = `!include "utils.nsh"
 {{#each language_files}}
   !include "{{this}}"
 {{/each}}
+; Use show readme button as desktop shortcut
+!define MUI_FINISHPAGE_SHOWREADME_FUNCTION CreateOrUpdateDesktopShortcut
+; Show run app after installation.
+!define MUI_FINISHPAGE_RUN
+!define MUI_FINISHPAGE_RUN_FUNCTION RunMainBinary
+!define MUI_PAGE_CUSTOMFUNCTION_PRE SkipIfPassive
+!insertmacro MUI_PAGE_FINISH
 Function RunMainBinary
   nsis_tauri_utils::RunAsUser "$INSTDIR\\\${MAINBINARYNAME}.exe" ""
+FunctionEnd
+; Uninstaller Pages
+Function .onInstSuccess
+  ; Check for /R flag only in silent and passive installers because
+  ; GUI installer has a toggle for the user to (re)start the app
+  \${If} $PassiveMode = 1
+  \${OrIf} \${Silent}
+    \${GetOptions} $CMDLINE "/R" $R0
+    \${IfNot} \${Errors}
+      \${GetOptions} $CMDLINE "/ARGS" $R0
+      nsis_tauri_utils::RunAsUser "$INSTDIR\\\${MAINBINARYNAME}.exe" "$R0"
+    \${EndIf}
+  \${EndIf}
 FunctionEnd
 ` + 'X'.repeat(25100);
 
 test('same-version reinstall cleans first, and upgrade cleanup precedes legacy uninstaller',()=>{
   const generated=customizeNsis(sample);
-  assert.match(generated,/Same version: default clean REINSTALL/);
+  assert.match(generated,/Same version: only offer uninstall-before-reinstall/);
   assert.match(generated,/StrCpy \$R2 "\$\(uninstallBeforeInstalling\)"/);
-  assert.match(generated,/StrCpy \$R3 "\$\(addOrReinstall\)"/);
-  assert.match(generated,/\$R0 = 0 ; Same version: first \(default\) = clean reinstall/);
-  assert.match(generated,/Goto reinst_uninstall\n    \$\{Else\}\s+; Explicit in-place reinstall\n      Goto reinst_done/);
+  assert.match(generated,/StrCpy \$R3 ""/);
+  assert.doesNotMatch(generated,/StrCpy \$R3 "\$\(addOrReinstall\)"/);
+  assert.match(generated,/\$R0 = 0 ; Same version: always uninstall before reinstall/);
+  assert.match(generated,/Same version: always uninstall before reinstall\n    Goto reinst_uninstall/);
+  assert.match(generated,/\$\{If\} \$R0 <> 0\n\s+\$\{NSD_CreateRadioButton\} 30u 70u/);
+  assert.match(generated,/\$\{If\} \$R0 = 0\n\s+SendMessage \$R2/);
   const uninstall = generated.split('  reinst_uninstall:')[1].split('    HideWindow')[0];
   assert.match(uninstall,/Banner::show "\$\(airpimoPreparingUninstall\)"/);
   assert.match(uninstall,/!insertmacro AIRPIMO_STOP_INSTALLED_PROCESSES/);
@@ -60,6 +95,7 @@ test('same-version reinstall cleans first, and upgrade cleanup precedes legacy u
 test('template preparation fails closed on unexpected Tauri layout',()=>{
   assert.throws(()=>customizeNsis(sample.replace('$(uninstallApp)','$(mutated)')),/template drift: same-version labels/);
   assert.throws(()=>customizeNsis(sample.replace('reinst_uninstall:', 'other_label:')),/template drift: old-uninstaller cleanup/);
+  assert.throws(()=>customizeNsis(sample.replace('30u 70u -30u 8u', '30u 71u -30u 8u')),/template drift: maintenance second option/);
   assert.throws(()=>customizeNsis(sample.replace('; Compare this installar version', '; Modified version')),/template drift: stale-registration bypass/);
   assert.ok(UPSTREAM.includes('tauri-v2.11.1'));
   assert.match(TARGET,/airpimo-installer\.nsi$/);
@@ -84,14 +120,14 @@ test('PowerShell payload matches versioned script and kills only installed path-
   assert.match(source,/throw \"WMI query failed/);
   assert.match(source,/Timed out waiting for scoped Airpimo/);
 
-  assert.match(source,/sidecar\\uxplay\.exe/);
+  assert.match(source,/sidecar\\AirpimoPlayer\.exe/);
   assert.doesNotMatch(source,/taskkill|Stop-Process|Win32_Process -Filter "Name='uxplay.exe'"/);
   assert.match(hooks,/!macro NSIS_HOOK_PREINSTALL/);
   assert.match(hooks,/!macro NSIS_HOOK_PREUNINSTALL/);
   assert.match(hooks,/SetEnvironmentVariableW/);
   assert.match(hooks,/No installed executable means a clean or already-removed installation/);
   assert.match(hooks,/\$INSTDIR\\Airpimo\.exe/);
-  assert.match(hooks,/\$INSTDIR\\sidecar\\uxplay\.exe/);
+  assert.match(hooks,/\$INSTDIR\\sidecar\\AirpimoPlayer\.exe/);
   assert.ok(hooks.indexOf('No installed executable') < hooks.indexOf('InitPluginsDir'));
   assert.match(source,/if \(-not \$hasInstalledExecutable\) \{ exit 0 \}/);
   assert.match(source,/Airpimo-installer-cleanup\.log/);

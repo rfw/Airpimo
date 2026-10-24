@@ -19,14 +19,24 @@ export function verifyReleaseTag(tag,projectRoot=defaultRoot){
   if (!/^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?$/.test(tag??'')) {
     throw new Error(`BLOCKED: Expected version tag vMAJOR.MINOR.PATCH[-prerelease], got ${JSON.stringify(tag)}`);
   }
-  const version=tag.slice(1).split('-')[0];
+  // Retain the tag's prerelease suffix in *release asset filenames* while
+  // accepting the base version in platform metadata (macOS/Windows require
+  // their own native version formats). Do not rewrite the existing platform labels.
+  const version=tag.slice(1);
+  const baseVersion=version.split('-')[0];
   const packageVersion=JSON.parse(readFileSync(join(projectRoot,'package.json'),'utf8')).version;
   const tauriVersion=JSON.parse(readFileSync(join(projectRoot,'src-tauri','tauri.conf.json'),'utf8')).version;
   const cargo=readFileSync(join(projectRoot,'src-tauri','Cargo.toml'),'utf8');
   const cargoVersion=cargo.match(/^version\s*=\s*"([^"]+)"/m)?.[1];
-  for(const [name,found] of [['package.json',packageVersion],['tauri.conf.json',tauriVersion],['Cargo.toml',cargoVersion]]){
-    if(found!==version) throw new Error(`BLOCKED: ${tag} does not match ${name} version ${found??'(missing)'}`);
+  const metadata=[['package.json',packageVersion],['tauri.conf.json',tauriVersion],['Cargo.toml',cargoVersion]];
+  for(const [name,found] of metadata){
+    if(found!==baseVersion && found!==version)
+      throw new Error(`BLOCKED: ${tag} does not match ${name} version ${found??'(missing)'}`);
   }
+  // Mixed project versions remain invalid even when each individually matches
+  // either the release tag or its base version.
+  if(new Set(metadata.map(([,found])=>found)).size!==1)
+    throw new Error(`BLOCKED: Project versions differ for ${tag}`);
   return version;
 }
 
