@@ -13,7 +13,7 @@
     "check": "npm run test && npm run test:source && npm run build && cargo test --manifest-path src-tauri/Cargo.toml",
     "tauri": "tauri",
     "desktop:dev": "node scripts/desktop-dev.mjs",
-    "desktop:build": "node scripts/check-native.mjs && tauri build",
+    "desktop:build": "node scripts/brand-windows-player.mjs --if-windows && node scripts/check-native.mjs && tauri build",
     "native:stage": "node scripts/stage-native.mjs",
     "check:rust-lock": "node scripts/check-tauri-lock.mjs",
     "verify:mac": "bash scripts/verify-macos.sh",

@@ -5,6 +5,7 @@ import {spawnSync} from 'node:child_process';
 import {resolve} from 'node:path';
 import {preserveNsisInstaller} from './windows-build-artifacts.mjs';
 import {prepareWindowsNsis} from './prepare-windows-nsis.mjs';
+import {brandWindowsPlayer} from './brand-windows-player.mjs';
 const root=resolve(import.meta.dirname,'..');
 const mdnsRequired=process.argv.includes('--require-mdns');
 function block(s){console.error(`[win7] BLOCKED: ${s}`);process.exit(2);}
@@ -14,8 +15,9 @@ if(!/^version\s*=\s*3\s*$/m.test(lock))block('Rust 1.77.2 requires Cargo.lock v3
 const version=spawnSync('rustc.exe',['--version'],{encoding:'utf8',windowsHide:true});
 if(version.error||version.status!==0||!/^rustc 1\.77\.2\s/.test(version.stdout))
   block(`Use Rust 1.77.2 MSVC in this terminal (RUSTUP_TOOLCHAIN=1.77.2-x86_64-pc-windows-msvc). Current: ${version.stdout??version.error?.message}`);
+try { brandWindowsPlayer(resolve(root,'src-tauri/resources')); } catch(error) { block(`Windows receiver branding failed: ${error.message}`); }
 for(const [program,args] of [
-  [process.execPath,['scripts/check-native.mjs','--win7',...(mdnsRequired?['--require-mdns']:[])]],
+  [process.execPath,['scripts/check-native.mjs','--win7','--require-branded-receiver',...(mdnsRequired?['--require-mdns']:[])]],
   [process.execPath,['scripts/check-tauri-lock.mjs']],
   [process.execPath,['--experimental-strip-types','--test','tests/packaging.test.mjs','tests/win7-pe-audit.test.mjs','tests/win7-mdns-provenance.test.mjs']],
 ]) {

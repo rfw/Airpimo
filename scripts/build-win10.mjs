@@ -5,6 +5,7 @@ import {spawnSync} from 'node:child_process';
 import {resolve} from 'node:path';
 import {preserveNsisInstaller} from './windows-build-artifacts.mjs';
 import {prepareWindowsNsis} from './prepare-windows-nsis.mjs';
+import {brandWindowsPlayer} from './brand-windows-player.mjs';
 const root=resolve(import.meta.dirname,'..');
 function block(reason) {console.error(`[win10+] BLOCKED: ${reason}`);process.exit(2)}
 if(process.platform!=='win32'||process.arch!=='x64') block('Run on a Windows x64 build host.');
@@ -16,7 +17,8 @@ if(legacy.bundle?.windows?.webviewInstallMode?.type!=='fixedRuntime')
   block('Win7 configuration must retain fixedRuntime');
 if(JSON.stringify(base.bundle?.resources??{}).includes('webview2-109'))
   block('Fixed WebView2 folder is unexpectedly included in shared bundle resources');
-for(const args of [['scripts/check-native.mjs'],['scripts/check-tauri-lock.mjs']]) {
+try { brandWindowsPlayer(resolve(root,'src-tauri/resources')); } catch(error) { block(`Windows receiver branding failed: ${error.message}`); }
+for(const args of [['scripts/check-native.mjs','--require-branded-receiver'],['scripts/check-tauri-lock.mjs']]) {
   const run=spawnSync(process.execPath,args,{cwd:root,stdio:'inherit',windowsHide:true});
   if(run.error||run.status!==0) block(`${args.join(' ')} failed; no installer generated`);
 }

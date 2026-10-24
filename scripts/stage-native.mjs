@@ -52,7 +52,7 @@ if(os==='win32' && sourceStart.toString('latin1',0,2)!=='MZ') die('Windows 版�
 if(os==='darwin' && !['feedfacf','cffaedfe','cafebabe','bebafeca'].includes(sourceStart.toString('hex'))) die('macOS 版本必须为 Mach-O 或通用二进制');
 const outSidecar=join(DEST,'sidecar'); const outGst=join(DEST,'gstreamer');
 mkdirSync(outSidecar,{recursive:true});
-for(const name of ['uxplay','uxplay.exe','Airpimo']) rmSync(join(outSidecar,name),{force:true});
+for(const name of ['uxplay','uxplay.exe','Airpimo','AirpimoPlayer.exe']) rmSync(join(outSidecar,name),{force:true});
 copyFileSync(sourceBinary,join(outSidecar,stagedBinName));
 if(os==='darwin') chmodSync(join(outSidecar,stagedBinName),0o755);
 rmSync(join(outGst,'bin'),{recursive:true,force:true}); rmSync(join(outGst,'lib'),{recursive:true,force:true}); rmSync(join(outGst,'libexec'),{recursive:true,force:true});

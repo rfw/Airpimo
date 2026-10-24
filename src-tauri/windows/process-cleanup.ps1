@@ -7,7 +7,9 @@ if ($root.Length -lt 4) { exit 3 }
 $targets = @(
   [IO.Path]::Combine($root, 'Airpimo.exe'),
   [IO.Path]::Combine($root, 'sidecar\uxplay.exe'),
-  [IO.Path]::Combine($root, 'resources\sidecar\uxplay.exe')
+  [IO.Path]::Combine($root, 'sidecar\AirpimoPlayer.exe'),
+  [IO.Path]::Combine($root, 'resources\sidecar\uxplay.exe'),
+  [IO.Path]::Combine($root, 'resources\sidecar\AirpimoPlayer.exe')
 )
 # A clean install or a previously deleted installation has nothing to stop.
 # Do not require working WMI just to create a new installation directory.
@@ -21,11 +23,11 @@ function Get-ScopedProcesses {
   # native process snapshot first and only invoke WMI when a candidate exists.
   # We still require an exact executable-path match before terminating anything.
   $candidates = @(Get-Process -ErrorAction Stop | Where-Object {
-    $_.ProcessName -ieq 'Airpimo' -or $_.ProcessName -ieq 'uxplay'
+    $_.ProcessName -ieq 'Airpimo' -or $_.ProcessName -ieq 'uxplay' -or $_.ProcessName -ieq 'AirpimoPlayer'
   })
   if ($candidates.Count -eq 0) { return }
   try {
-    $items = @(Get-WmiObject Win32_Process -Filter "Name='Airpimo.exe' OR Name='uxplay.exe'" -ErrorAction Stop)
+    $items = @(Get-WmiObject Win32_Process -Filter "Name='Airpimo.exe' OR Name='uxplay.exe' OR Name='AirpimoPlayer.exe'" -ErrorAction Stop)
   } catch {
     throw "WMI query failed while candidate process names exist: $($_.Exception.Message)"
   }

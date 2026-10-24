@@ -66,7 +66,7 @@ export function planWindowsPrune(resources,{manifest,inspect,read=readFileSync,p
  // Automatic video/audio sinks discover platform backends at runtime. Keep
  // all known sink plugins when available, never rely on autovideosink alone.
  for(const [key,name] of plugins) if(/(?:d3d11|d3d12|directsound|wasapi|wasapi2|dshow|opengl|glimagesink)/i.test(key)) chosen.add(name);
- const roots=['sidecar/uxplay.exe','gstreamer/bin/gst-inspect-1.0.exe',
+ const roots=[(data.files?.some(f=>f.path==='sidecar/AirpimoPlayer.exe')?'sidecar/AirpimoPlayer.exe':'sidecar/uxplay.exe'),'gstreamer/bin/gst-inspect-1.0.exe',
    'gstreamer/libexec/gstreamer-1.0/gst-plugin-scanner.exe',...chosen];
  for(const path of roots)if(!files.has(path))errors.push('Required native root missing: '+path);
  const retained=new Set(),queue=roots.filter(path=>files.has(path));

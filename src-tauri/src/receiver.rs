@@ -536,7 +536,7 @@ fn sidecar_path(app: &AppHandle) -> Result<(PathBuf, bool), String> {
         return Ok((requested, true));
     }
     let dir = app.path().resource_dir().map_err(|e| e.to_string())?;
-    #[cfg(windows)] let filename = "uxplay.exe";
+    #[cfg(windows)] let filename = "AirpimoPlayer.exe";
     #[cfg(target_os = "macos")] let filename = "Airpimo";
     #[cfg(all(not(windows), not(target_os = "macos")))] let filename = "uxplay";
     let path = dir.join("sidecar").join(filename);
@@ -545,6 +545,12 @@ fn sidecar_path(app: &AppHandle) -> Result<(PathBuf, bool), String> {
         let local = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("resources").join("sidecar").join(filename);
         if local.is_file() { return Ok((local, false)); }
+        #[cfg(windows)] {
+            // Legacy cache is only accepted in debug builds. Shipping must be branded.
+            let legacy = Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("resources").join("sidecar").join("uxplay.exe");
+            if legacy.is_file() { return Ok((legacy, false)); }
+        }
         return Err("开发模式未找到 UxPlay。请执行 npm run native:doctor，或使用 npm run desktop:dev -- --uxplay /绝对路径/UxPlay/build/uxplay".into());
     }
     #[cfg(not(debug_assertions))]

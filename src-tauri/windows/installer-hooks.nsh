@@ -15,7 +15,9 @@ Var AirpimoPreparationBanner
   ; Do not launch PowerShell/WMI on the first installation.
   ${If} ${FileExists} "$INSTDIR\Airpimo.exe"
   ${OrIf} ${FileExists} "$INSTDIR\sidecar\uxplay.exe"
+  ${OrIf} ${FileExists} "$INSTDIR\sidecar\AirpimoPlayer.exe"
   ${OrIf} ${FileExists} "$INSTDIR\resources\sidecar\uxplay.exe"
+  ${OrIf} ${FileExists} "$INSTDIR\resources\sidecar\AirpimoPlayer.exe"
     InitPluginsDir
     ; PowerShell v2 can fail in nsExec when STDIN is redirected. The NSIS
     ; documentation also warns against launching a .ps1 directly from the
@@ -38,7 +40,9 @@ Var AirpimoPreparationBanner
     FileWriteUTF16LE $R9 "$$targets = @($\r$\n"
     FileWriteUTF16LE $R9 "  [IO.Path]::Combine($$root, 'Airpimo.exe'),$\r$\n"
     FileWriteUTF16LE $R9 "  [IO.Path]::Combine($$root, 'sidecar\uxplay.exe'),$\r$\n"
-    FileWriteUTF16LE $R9 "  [IO.Path]::Combine($$root, 'resources\sidecar\uxplay.exe')$\r$\n"
+    FileWriteUTF16LE $R9 "  [IO.Path]::Combine($$root, 'sidecar\AirpimoPlayer.exe'),$\r$\n"
+    FileWriteUTF16LE $R9 "  [IO.Path]::Combine($$root, 'resources\sidecar\uxplay.exe'),$\r$\n"
+    FileWriteUTF16LE $R9 "  [IO.Path]::Combine($$root, 'resources\sidecar\AirpimoPlayer.exe')$\r$\n"
     FileWriteUTF16LE $R9 ")$\r$\n"
     FileWriteUTF16LE $R9 "# A clean install or a previously deleted installation has nothing to stop.$\r$\n"
     FileWriteUTF16LE $R9 "# Do not require working WMI just to create a new installation directory.$\r$\n"
@@ -52,11 +56,11 @@ Var AirpimoPreparationBanner
     FileWriteUTF16LE $R9 "  # native process snapshot first and only invoke WMI when a candidate exists.$\r$\n"
     FileWriteUTF16LE $R9 "  # We still require an exact executable-path match before terminating anything.$\r$\n"
     FileWriteUTF16LE $R9 "  $$candidates = @(Get-Process -ErrorAction Stop | Where-Object {$\r$\n"
-    FileWriteUTF16LE $R9 "    $$_.ProcessName -ieq 'Airpimo' -or $$_.ProcessName -ieq 'uxplay'$\r$\n"
+    FileWriteUTF16LE $R9 "    $$_.ProcessName -ieq 'Airpimo' -or $$_.ProcessName -ieq 'uxplay' -or $$_.ProcessName -ieq 'AirpimoPlayer'$\r$\n"
     FileWriteUTF16LE $R9 "  })$\r$\n"
     FileWriteUTF16LE $R9 "  if ($$candidates.Count -eq 0) { return }$\r$\n"
     FileWriteUTF16LE $R9 "  try {$\r$\n"
-    FileWriteUTF16LE $R9 "    $$items = @(Get-WmiObject Win32_Process -Filter $\"Name='Airpimo.exe' OR Name='uxplay.exe'$\" -ErrorAction Stop)$\r$\n"
+    FileWriteUTF16LE $R9 "    $$items = @(Get-WmiObject Win32_Process -Filter $\"Name='Airpimo.exe' OR Name='uxplay.exe' OR Name='AirpimoPlayer.exe'$\" -ErrorAction Stop)$\r$\n"
     FileWriteUTF16LE $R9 "  } catch {$\r$\n"
     FileWriteUTF16LE $R9 "    throw $\"WMI query failed while candidate process names exist: $$($$_.Exception.Message)$\"$\r$\n"
     FileWriteUTF16LE $R9 "  }$\r$\n"

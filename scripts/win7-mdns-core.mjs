@@ -31,7 +31,7 @@ export function verifyMdnsReceipt(receipt,{lock=readMdnsLock(),binary}={}) {
 export function verifyMdnsManifest(manifest,{lock=readMdnsLock()}={}) {
   if(manifest.os!=='win32' ||manifest.arch!=='x64' || manifest.discovery?.backend!=='internal-mdns' || manifest.discovery?.watermarkPatchSha256!==MDNS_WATERMARK_PATCH_SHA256 || manifest.upstream?.commit!==lock.commit || manifest.upstream?.tag!=='1.74-experimental-pinned' || !HASH.test(manifest.discovery?.engineSha256||''))
     throw Error('Win7 self-contained mDNS requires an audited 1.74 experimental engine manifest, not the legacy Bonjour runtime.');
-  const exe=manifest.files?.find(x=>x.path==='sidecar/uxplay.exe');
+  const exe=manifest.files?.find(x=>x.path==='sidecar/AirpimoPlayer.exe' || x.path==='sidecar/uxplay.exe');
   if(!exe || exe.sha256!==manifest.discovery.engineSha256) throw Error('mDNS provenance SHA-256 differs from packaged sidecar');
   return true;
 }

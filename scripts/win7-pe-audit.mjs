@@ -108,7 +108,7 @@ export function auditWin7Runtime(root, manifest, {read=readFileSync}={}) {
     // Prioritize gstreamer/bin as the Windows DLL search path configured for the child.
     if(!byName.has(name) || item.path.startsWith('gstreamer/bin/')) byName.set(name,item.path);
   }
-  const roots=['sidecar/uxplay.exe','gstreamer/bin/gst-inspect-1.0.exe','gstreamer/libexec/gstreamer-1.0/gst-plugin-scanner.exe',
+  const roots=[(manifest.files?.some(f=>f.path==='sidecar/AirpimoPlayer.exe')?'sidecar/AirpimoPlayer.exe':'sidecar/uxplay.exe'),'gstreamer/bin/gst-inspect-1.0.exe','gstreamer/libexec/gstreamer-1.0/gst-plugin-scanner.exe',
     'gstreamer/lib/gstreamer-1.0/libgstlibav.dll','gstreamer/lib/gstreamer-1.0/libgstcoreelements.dll',
     'gstreamer/lib/gstreamer-1.0/libgstaudioconvert.dll','gstreamer/lib/gstreamer-1.0/libgstaudioresample.dll',
     'gstreamer/lib/gstreamer-1.0/libgstvideoconvertscale.dll'];

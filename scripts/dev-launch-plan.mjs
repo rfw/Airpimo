@@ -5,7 +5,8 @@ import {join} from 'node:path';
 // It must take priority over a stale, but hash-valid, previously imported cache.
 export function stagedNativePaths(root, platform = process.platform, exists = existsSync) {
   const resources = join(root, 'src-tauri', 'resources');
-  const binary = join(resources, 'sidecar', platform === 'win32' ? 'uxplay.exe' : 'uxplay');
+  const branded = join(resources, 'sidecar', 'AirpimoPlayer.exe');
+  const binary = platform === 'win32' && exists(branded) ? branded : join(resources, 'sidecar', platform === 'win32' ? 'uxplay.exe' : 'uxplay');
   const runtime = join(resources, 'gstreamer');
   if (!exists(binary) || !exists(join(runtime, 'bin')) || !exists(join(runtime, 'lib', 'gstreamer-1.0'))) return null;
   try { if (!statSync(binary).isFile()) return null; } catch { return null; }
