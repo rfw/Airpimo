@@ -191,7 +191,7 @@ function App() {
       snapshot={snapshot} ready={ready} busy={actionBusy} now={now} bootError={bootError} feedback={feedback}
       onStart={() => void execute(desktop.start)} onStop={() => void execute(desktop.stop)}
       onRetry={() => void execute(desktop.retry)} onCopy={(value) => void copy(value)}
-      onSettings={() => openSettings()} onProject={() => void openProject()}
+      onSettings={() => openSettings()}
       onClearFeedback={() => setFeedback('')} updateAvailable={updateResult?.kind === 'available'}
     />
 
@@ -200,6 +200,7 @@ function App() {
       setSettingsOpen={setSettingsOpen}
       settingsTab={settingsTab}
       chooseTab={chooseTab}
+      onProject={() => void openProject()}
       draft={draft}
       setDraft={setDraft}
       saveSettings={saveSettings}

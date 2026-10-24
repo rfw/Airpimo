@@ -164,7 +164,10 @@ impl Controller {
             (i.child.take(),job)
         };
         if let Some(mut child) = child { let _ = child.kill(); let _ = child.wait(); }
-        drop(receiver_job); // Close the Job Object after the parent exits.
+        #[cfg(windows)]
+        drop(receiver_job); // Close the Job Object after the receiver exits.
+        #[cfg(not(windows))]
+        let _ = receiver_job;
         self.publish(app);
         self.snapshot()
     }

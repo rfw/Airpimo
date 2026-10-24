@@ -1,5 +1,6 @@
-import type { Dispatch, SetStateAction } from "react";
-import { X } from "lucide-react";
+import { useState, type Dispatch, type SetStateAction } from "react";
+import { ExternalLink, Github, X } from "lucide-react";
+import airpimoIcon from "../../src-tauri/icons/128x128.png";
 import { brand } from "../brand";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -8,13 +9,14 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dial
 import type { Settings, ThemeChoice } from "../domain/state";
 import type { ReleaseStatus } from "../lib/release-update";
 
-export type SettingsTab = "config" | "theme" | "updates" | "diagnostics";
+export type SettingsTab = "config" | "theme" | "updates" | "about" | "diagnostics";
 
 interface SettingsDialogProps {
   settingsOpen: boolean;
   setSettingsOpen(value: boolean): void;
   settingsTab: SettingsTab;
   chooseTab(tab: SettingsTab): void;
+  onProject(): void;
   draft: Settings;
   setDraft: Dispatch<SetStateAction<Settings>>;
   saveSettings(): Promise<void>;
@@ -45,6 +47,7 @@ export function AirpimoSettingsDialog({
                                         setSettingsOpen,
                                         settingsTab,
                                         chooseTab,
+                                        onProject,
                                         draft,
                                         setDraft,
                                         saveSettings,
@@ -62,6 +65,16 @@ export function AirpimoSettingsDialog({
                                         diagnosticsExporting,
                                       }: SettingsDialogProps) {
   const { dialogClass, overlayClass } = useDialogPosition();
+  // UI-only preference: hiding the editor never resets or disables saved UxPlay args.
+  const [showAdvanced, setShowAdvanced] = useState(() => {
+    try { return localStorage.getItem("airpimo.settings.showAdvanced") === "true"; }
+    catch { return false; }
+  });
+  function toggleAdvanced(checked: boolean) {
+    setShowAdvanced(checked);
+    try { localStorage.setItem("airpimo.settings.showAdvanced", String(checked)); }
+    catch { /* Safe for browsers with storage disabled. */ }
+  }
   const panelClass =
       "min-h-0 flex-1 overflow-y-auto overscroll-contain px-[4px] pb-5 pt-4 scroll-p-4";
 
@@ -92,7 +105,7 @@ export function AirpimoSettingsDialog({
           </div>
 
           <div
-              className="grid shrink-0 grid-cols-4 gap-1 border-b border-border pb-2"
+              className="grid shrink-0 grid-cols-5 gap-1 border-b border-border pb-2"
               role="tablist"
               aria-label="设置选项卡"
           >
@@ -101,6 +114,7 @@ export function AirpimoSettingsDialog({
                   ["config", "配置"],
                   ["theme", "主题"],
                   ["updates", "升级"],
+                  ["about", "关于"],
                   ["diagnostics", "诊断"],
                 ] as const
             ).map(([value, label]) => (
@@ -212,7 +226,18 @@ export function AirpimoSettingsDialog({
                 />
               </div>
 
-              <div className="mt-[14px] min-w-0 border-t border-border pt-3">
+              <label htmlFor="showAdvanced" className="flex cursor-pointer items-center justify-between border-b border-border px-px py-2">
+                <span className="text-xs font-semibold">高级功能</span>
+                <input
+                    id="showAdvanced"
+                    type="checkbox"
+                    className="h-4 w-4 shrink-0 cursor-pointer accent-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    checked={showAdvanced}
+                    onChange={(e) => toggleAdvanced(e.target.checked)}
+                />
+              </label>
+
+              {showAdvanced && <div className="mt-[14px] min-w-0 border-t border-border pt-3">
                 <label className="mb-[5px] block text-xs font-semibold" htmlFor="uxplayArgs">
                   UxPlay 自定义启动参数（高级）
                 </label>
@@ -234,7 +259,7 @@ export function AirpimoSettingsDialog({
                 <p className="my-1 text-[10px] text-muted-foreground">
                   优先级：上方设置 ＞ 自定义参数 ＞ 默认参数。支持换行、引号；-vol 可调整音量。
                 </p>
-              </div>
+              </div>}
             </section>
 
             <section
@@ -323,6 +348,44 @@ export function AirpimoSettingsDialog({
                     </Button>
                 )}
               </div>
+            </section>
+
+            <section
+                id="airpimo-panel-about"
+                role="tabpanel"
+                aria-labelledby="airpimo-tab-about"
+                hidden={settingsTab !== "about"}
+                className={panelClasses("about")}
+            >
+              <div className="flex flex-col items-center pb-5 pt-2 text-center">
+                <img src={airpimoIcon} alt="Airpimo 应用图标" className="h-16 w-16 object-contain" />
+                <h2 className="mt-2 text-lg font-semibold tracking-tight">Airpimo</h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">版本 v{brand.version}</p>
+                <p className="mt-3 text-xs text-muted-foreground">轻量、开源的 AirPlay 接收工具</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">支持将 iPhone / iPad 屏幕投射到电脑</p>
+              </div>
+              <div className="divide-y divide-border border-y border-border">
+                <button
+                    type="button"
+                    onClick={onProject}
+                    className="flex w-full items-center justify-between gap-3 bg-transparent px-px py-3 text-left hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                    aria-label="打开 GitHub 项目主页"
+                >
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    <Github size={17} strokeWidth={1.8} aria-hidden="true" />
+                    <span className="min-w-0">
+                      <strong className="block text-xs font-semibold">GitHub</strong>
+                      <small className="mt-1 block break-all text-[10px] text-muted-foreground">github.com/rfw/Airpimo</small>
+                    </span>
+                  </span>
+                  <ExternalLink size={14} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+                </button>
+                <div className="flex items-center justify-between gap-3 px-px py-3 text-xs">
+                  <span className="font-semibold">开源协议</span>
+                  <span className="text-muted-foreground">GPL-3.0-or-later</span>
+                </div>
+              </div>
+              <p className="mt-5 text-center text-[10px] text-muted-foreground">© Airpimo</p>
             </section>
 
             <section
