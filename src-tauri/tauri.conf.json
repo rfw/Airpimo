@@ -59,7 +59,14 @@
         "installerHooks": "./windows/installer-hooks.nsh",
         "languages": [
           "English",
-          "SimpChinese"
+          "SimpChinese",
+          "TradChinese",
+          "Japanese",
+          "Korean",
+          "French",
+          "German",
+          "Spanish",
+          "Russian"
         ]
       },
       "webviewInstallMode": {
