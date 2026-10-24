@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from "./lib/i18n-react";
 import { translate } from "./lib/i18n";
 import { brand } from './brand';
-import { defaultSnapshot, validateDeviceName, validateBrightness, validateFps, validateUxplayArgs, type Settings, type Snapshot, type ThemeChoice } from './domain/state';
+import { defaultSnapshot, validateDeviceName, validateFps, validateUxplayArgs, type Settings, type Snapshot, type ThemeChoice } from './domain/state';
 import { copyText } from './lib/copy';
 import { desktop, isDesktop } from './lib/desktop';
 import { AirpimoHome } from './components/AirpimoHome';
@@ -239,8 +239,6 @@ function App() {
     if (problem) { setFormError(problem); return; }
     const fpsError = validateFps(draft.fps);
     if (fpsError) { setFormError(fpsError); return; }
-    const brightnessError = validateBrightness(draft.brightness);
-    if (brightnessError) { setFormError(brightnessError); return; }
     const argsError = validateUxplayArgs(draft.uxplay_args);
     if (argsError) { setFormError(argsError); return; }
     setFormError(''); setActionBusy(true);

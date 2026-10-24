@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {defaultSnapshot, stageTitle, secondaryText, issueHint, validateDeviceName, validateFps, validateBrightness, showRestartPrompt, formatDuration} from '../src/domain/state.ts';
+import {defaultSnapshot, stageTitle, secondaryText, issueHint, validateDeviceName, validateFps, showRestartPrompt, formatDuration} from '../src/domain/state.ts';
 
 test('all required six states are described',()=>{
   assert.deepEqual(Object.keys(stageTitle).sort(),['connected','connecting','error','starting','stopped','waiting'].sort());
@@ -76,15 +76,9 @@ test('FPS changes prompt restart only while receiver is running',()=>{
 });
 
 
-test('brightness 100% default and strict range',()=>{
-  assert.equal(defaultSnapshot.settings.brightness,100);
-  for (const x of [0,5,50,80,95,100]) assert.equal(validateBrightness(x),null);
-  for (const x of [-1,101,80.5,NaN,Infinity]) assert.ok(validateBrightness(x));
-});
-test('brightness change shows restart note only while active',()=>{
-  const state = {...defaultSnapshot,process_running:true,applied_brightness:80,
-    settings:{...defaultSnapshot.settings,brightness:65}};
-  assert.equal(showRestartPrompt(state),true);
-  assert.equal(showRestartPrompt({...state,process_running:false}),false);
-  assert.equal(showRestartPrompt({...state,settings:{...state.settings,brightness:80}}),false);
+test('legacy picture controls are not in the active settings or restart comparison',()=>{
+  assert.equal(Object.hasOwn(defaultSnapshot.settings, 'brightness'),false);
+  assert.equal(Object.hasOwn(defaultSnapshot,'applied_brightness'),false);
+  assert.equal(showRestartPrompt({...defaultSnapshot,process_running:true,
+    settings:{...defaultSnapshot.settings,brightness:30},applied_brightness:100}),false);
 });

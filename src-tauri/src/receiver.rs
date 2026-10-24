@@ -29,6 +29,9 @@ fn tray_should_stop(stage: &str, process_running: bool) -> bool {
 fn should_keep_display_awake(stage: &str, process_running: bool, stopping: bool) -> bool {
     stage == "connected" && process_running && !stopping
 }
+fn should_rearm_closed_player(stage: &str, process_running: bool, stopping: bool) -> bool {
+    stage == "connected" && process_running && !stopping
+}
 fn unix_now() -> u64 { SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() }
 
 #[derive(Clone, Serialize)]
@@ -39,7 +42,6 @@ pub struct Snapshot {
     device_name: String,
     applied_device_name: Option<String>,
     applied_fps: Option<u16>,
-    applied_brightness: Option<u8>,
     applied_uxplay_args: Option<String>,
     process_running: bool,
     discovery_verified: bool,
@@ -61,7 +63,6 @@ struct Inner {
     restart_attempts: u8,
     applied_device_name: Option<String>,
     applied_fps: Option<u16>,
-    applied_brightness: Option<u8>,
     applied_uxplay_args: Option<String>,
     connected_since: Option<u64>,
     started_at: Option<Instant>,
@@ -75,7 +76,6 @@ impl Inner {
             stage: self.stage, detail: self.detail.clone(), issue: self.issue,
             device_name: self.settings.device_name.clone(), applied_device_name: self.applied_device_name.clone(),
             applied_fps: self.applied_fps,
-            applied_brightness: self.applied_brightness,
             applied_uxplay_args: self.applied_uxplay_args.clone(),
             process_running: self.child.is_some(), discovery_verified: false, audio_verified: false,
             connected_since: self.connected_since, restart_attempts: self.restart_attempts,
@@ -111,7 +111,7 @@ impl Controller {
         Arc::new(Self { inner: Mutex::new(Inner {
             settings, stage:"stopped", detail:"接收服务已停止".into(), issue:None, child:None,
             #[cfg(windows)] receiver_job:None,
-            epoch:0, stopping:true, restart_attempts:0, applied_device_name:None, applied_fps:None, applied_brightness:None, applied_uxplay_args:None,
+            epoch:0, stopping:true, restart_attempts:0, applied_device_name:None, applied_fps:None, applied_uxplay_args:None,
             connected_since:None, started_at:None, connecting_at:None, logs, power_inhibitor:None,
         }), settings_path })
     }
@@ -136,7 +136,6 @@ impl Controller {
     pub fn save_settings(self: &Arc<Self>, app: &AppHandle, mut next: Settings) -> Result<Snapshot,String> {
         settings::validate_name(&next.device_name)?;
         settings::validate_fps(next.fps)?;
-        settings::validate_brightness(next.brightness)?;
         crate::uxplay_args::validate(&next.uxplay_args)?;
         next.device_name = next.device_name.trim().to_string();
         // Disk write and state mutation share the same lock; concurrent IPC writes cannot race
@@ -188,7 +187,7 @@ impl Controller {
         let (child, receiver_job) = {
             let mut i=self.inner.lock().unwrap();
             i.stopping=true; i.epoch+=1; i.stage="stopped"; i.detail="接收服务已停止".into();
-            i.issue=None; i.connected_since=None; i.connecting_at=None; i.applied_device_name=None; i.applied_fps=None; i.applied_brightness=None; i.applied_uxplay_args=None; i.restart_attempts=0;
+            i.issue=None; i.connected_since=None; i.connecting_at=None; i.applied_device_name=None; i.applied_fps=None; i.applied_uxplay_args=None; i.restart_attempts=0;
             i.log("stopped_by_user"); i.power_inhibitor = None;
             #[cfg(windows)] let job=i.receiver_job.take();
             #[cfg(not(windows))] let job=();
@@ -207,14 +206,14 @@ impl Controller {
         self.start(app, true)
     }
     pub fn start(self: &Arc<Self>, app: &AppHandle, reset_backoff: bool) -> Snapshot {
-        let (epoch, name, fps, brightness, user_args) = {
+        let (epoch, name, fps, user_args) = {
             let mut i=self.inner.lock().unwrap();
             if start_already_in_progress(i.child.is_some(), i.stopping, i.stage) { return i.snapshot(); }
             i.stopping=false;
             if reset_backoff { i.restart_attempts=0; }
             i.epoch+=1; i.stage="starting"; i.detail="正在启动 UxPlay…".into(); i.issue=None;
-            i.connected_since=None; i.connecting_at=None; i.started_at=Some(Instant::now()); i.applied_device_name=None; i.applied_fps=None; i.applied_brightness=None; i.applied_uxplay_args=None;
-            i.log("starting_receiver"); (i.epoch, i.settings.device_name.clone(), i.settings.fps, i.settings.brightness, i.settings.uxplay_args.clone())
+            i.connected_since=None; i.connecting_at=None; i.started_at=Some(Instant::now()); i.applied_device_name=None; i.applied_fps=None; i.applied_uxplay_args=None;
+            i.log("starting_receiver"); (i.epoch, i.settings.device_name.clone(), i.settings.fps, i.settings.uxplay_args.clone())
         };
         self.publish(app);
         let (binary, dev_binary) = match sidecar_path(app) {
@@ -222,7 +221,7 @@ impl Controller {
             Err(err)=>{ self.error(app,epoch,"missing_binary",&err); return self.snapshot(); }
         };
         // GUI settings always win, then expert parameters, then built-in defaults.
-        let effective_args = match crate::uxplay_args::effective(&name, fps, brightness, &user_args) {
+        let effective_args = match crate::uxplay_args::effective(&name, fps, &user_args) {
             Ok(args) => args,
             Err(err) => { self.error(app, epoch, "unknown", &err); return self.snapshot(); }
         };
@@ -258,20 +257,28 @@ impl Controller {
                 return self.snapshot();
             }
         };
-        // Only observe video windows owned by the newly spawned UxPlay child.
-        // No global Windows message hooks or user input capture is installed.
-        #[cfg(windows)]
-        crate::windows_player::watch(child.id());
+        let receiver_pid = child.id();
         let stdout=child.stdout.take(); let stderr=child.stderr.take();
         {
             let mut i=self.inner.lock().unwrap();
             if i.epoch != epoch || i.stopping { let _=child.kill(); let _=child.wait(); return i.snapshot(); }
             #[cfg(windows)] { i.receiver_job=Some(job); }
-            i.child=Some(child); i.applied_device_name=Some(name); i.applied_fps=Some(fps); i.applied_brightness=Some(brightness); i.applied_uxplay_args=Some(user_args);
+            i.child=Some(child); i.applied_device_name=Some(name); i.applied_fps=Some(fps); i.applied_uxplay_args=Some(user_args);
             if dev_binary { i.log("development_local_binary_unbundled_gstreamer"); }
             i.log("sidecar_spawned_discovery_unverified");
         }
         self.publish(app);
+        // Watch after the child is committed to the controller. Never treat a
+        // transiently missing renderer during startup as an active close.
+        #[cfg(windows)] {
+            let owner = self.clone();
+            let app_clone = app.clone();
+            crate::windows_player::watch(receiver_pid, move || {
+                owner.player_window_closed(&app_clone, epoch)
+            });
+        }
+        #[cfg(not(windows))]
+        let _ = receiver_pid;
         // ChildStdout and ChildStderr are different concrete types. Do not put
         // Option<ChildStdout> and Option<ChildStderr> in one homogeneous array.
         // The generic reader accepts each stream independently while preserving
@@ -321,16 +328,31 @@ impl Controller {
         }
         self.publish(app);
     }
+    // A native player window is gone but UxPlay may remain alive without
+    // emitting a mirroring teardown line. A stale "connected" stage would keep
+    // the display awake indefinitely and lie to the UI. Re-arm this receiver
+    // from its one authoritative controller; reject events from a previous PID
+    // or epoch, and never restart for a window lost after mirror teardown.
+    fn player_window_closed(self: &Arc<Self>, app: &AppHandle, epoch: u64) -> bool {
+        let allowed = {
+            let i = self.inner.lock().unwrap();
+            i.epoch == epoch && should_rearm_closed_player(i.stage, i.child.is_some(), i.stopping)
+        };
+        if !allowed { return false; }
+        {
+            let mut i = self.inner.lock().unwrap();
+            if i.epoch != epoch || !should_rearm_closed_player(i.stage, i.child.is_some(), i.stopping) { return false; }
+            i.log("player_window_closed_rearming_receiver");
+        }
+        self.retry(app);
+        true
+    }
     fn observe(self: &Arc<Self>, app:&AppHandle, epoch:u64, line:&str) {
-        // The macOS title helper intercepts a user-initiated close before
-        // GStreamer destroys its GL surface. Stop this child through the
-        // controller instead of racing the active video-rendering thread.
+        // The macOS helper intercepts close BEFORE the GL surface is destroyed.
+        // Preserve the safe stop path while re-arming discovery for the next
+        // screen-mirroring session (the main Airpimo window stays open).
         if line.trim() == "AIRPIMO_PLAYER_WINDOW_HIDDEN" {
-            let allowed = {
-                let i = self.inner.lock().unwrap();
-                i.epoch == epoch && !i.stopping && i.child.is_some()
-            };
-            if allowed { self.stop(app); }
+            let _ = self.player_window_closed(app, epoch);
             return;
         }
         // Keep bounded, structured macOS helper diagnostics visible in Airpimo's
@@ -377,7 +399,7 @@ impl Controller {
             if i.epoch!=epoch || i.stopping {return;}
             i.power_inhibitor = None; i.child.take();
             #[cfg(windows)] { i.receiver_job.take(); }
-            i.connected_since=None; i.connecting_at=None; i.applied_device_name=None; i.applied_fps=None; i.applied_brightness=None; i.applied_uxplay_args=None;
+            i.connected_since=None; i.connecting_at=None; i.applied_device_name=None; i.applied_fps=None; i.applied_uxplay_args=None;
             if i.started_at.map(|t| t.elapsed() > Duration::from_secs(60)).unwrap_or(false) { i.restart_attempts=0; }
             i.restart_attempts=i.restart_attempts.saturating_add(1);
             i.stage="error";
@@ -469,6 +491,16 @@ mod stream_tests {
         assert!(!should_keep_display_awake("connected", false, false));
         assert!(!should_keep_display_awake("connected", true, true));
         assert!(should_keep_display_awake("connected", true, false));
+    }
+
+    #[test]
+    fn player_close_only_rearms_active_mirroring() {
+        assert!(should_rearm_closed_player("connected", true, false));
+        for stage in ["starting", "waiting", "connecting", "stopped", "error"] {
+            assert!(!should_rearm_closed_player(stage, true, false));
+        }
+        assert!(!should_rearm_closed_player("connected", false, false));
+        assert!(!should_rearm_closed_player("connected", true, true));
     }
 
     #[test]
@@ -597,7 +629,9 @@ fn setup_mac_video_controls(app: &AppHandle, command: &mut Command, development:
             .join("uxplay-fullscreen-macos.dylib")
     };
     if !shipped.is_file() {
-        if development { return Ok(()); }
+        if development {
+            return Err("开发模式缺少 macOS 播放器安全关闭扩展；请使用 npm run desktop:dev 重新生成原生辅助库".into());
+        }
         return Err("安装包缺少 macOS 播放窗口标题原生扩展，请重新生成完整版安装包".into());
     }
     // Do not inherit untrusted DYLD_INSERT_LIBRARIES. Only the version built

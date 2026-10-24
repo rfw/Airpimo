@@ -81,7 +81,7 @@ test('macOS child helper prevents destructive close and requests controlled rece
  assert.doesNotMatch(helper,/toggleFullScreen|NSEventMaskLeftMouseDown|addSubview:button|exit\(0\)/);
  const receiver=read('src-tauri/src/receiver.rs');
  assert.match(receiver,/line\.trim\(\) == "AIRPIMO_PLAYER_WINDOW_HIDDEN"/);
- assert.match(receiver,/if allowed \{ self\.stop\(app\); \}/);
+ assert.match(receiver,/self\.player_window_closed\(app, epoch\)/);
  assert.match(receiver,/fn observe\(self: &Arc<Self>/);
  assert.match(read('scripts/desktop-dev.mjs'),/ensureMacTitleHelper\(root\)/);
 });

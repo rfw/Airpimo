@@ -203,12 +203,14 @@ fn pointer_in_video_content(hwnd: Hwnd, cursor: Point) -> bool {
 
 /// Call after the child has been spawned; thread exits automatically when its PID exits.
 /// Observes mouse edges only while the *child video window* is foreground.
-pub fn watch(child_pid: u32) {
+pub fn watch(child_pid: u32, mut on_closed: impl FnMut() -> bool + Send + 'static) {
     thread::spawn(move || {
         let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, 0, child_pid) };
         if process == 0 { return; }
         let taskbar = Taskbar::new();
         let mut hwnd: Hwnd = 0;
+        let mut saw_video_window = false;
+        let mut window_missing_since: Option<Instant> = None;
         let mut fullscreen: Option<Windowed> = None;
         let mut mouse_was_down = false;
         let mut esc_was_down = false;
@@ -224,7 +226,24 @@ pub fn watch(child_pid: u32) {
                 last_title = Instant::now() - Duration::from_secs(5);
                 if hwnd != 0 { taskbar.suppress_child_taskbar_button(hwnd); }
             }
-            if hwnd == 0 || unsafe { IsWindow(hwnd) } == 0 { continue; }
+            if hwnd != 0 && unsafe { IsWindow(hwnd) } != 0 {
+                saw_video_window = true;
+                window_missing_since = None;
+            } else {
+                // A destroyed video HWND is not the same as a minimized or
+                // temporarily hidden window. Allow renderer replacement while
+                // the phone rotates before reporting a real close. Only the
+                // controller may decide whether mirroring is still connected.
+                if saw_video_window {
+                    let elapsed = window_missing_since.get_or_insert_with(Instant::now).elapsed();
+                    if elapsed >= Duration::from_millis(800) {
+                        if on_closed() { break; }
+                        saw_video_window = false;
+                        window_missing_since = None;
+                    }
+                }
+                continue;
+            }
             if fullscreen.is_none() && last_title.elapsed() >= Duration::from_millis(1200) {
                 set_title_and_maximize_button(hwnd);
                 // Explorer can add a taskbar entry after initial discovery

@@ -28,12 +28,12 @@ test('editing advanced parameters requests restart only for running receiver',()
 test('receiver passes effective argv to spawn directly, without shell',()=>{
   const rust=read('src-tauri/src/receiver.rs');
   const argv=read('src-tauri/src/uxplay_args.rs');
-  assert.match(rust,/uxplay_args::effective\(&name, fps, brightness, &user_args\)/);
+  assert.match(rust,/uxplay_args::effective\(&name, fps, &user_args\)/);
   assert.match(rust,/command\.args\(&effective_args\)\.stdin\(Stdio::null\(\)\)/);
   assert.doesNotMatch(rust,/\.shell\(|cmd\.exe|powershell\.exe/);
   for (const key of ['"-n"','"-fps"','"-vc"']) assert.match(argv,new RegExp(key));
   assert.match(argv,/push_default\(&mut args, &custom, "-vol", Some\("0\.5"\)\)/);
-  assert.match(argv,/if brightness < 100/);
+  assert.doesNotMatch(argv,/videobalance|brightness/);
   assert.match(argv,/quote\.is_some\(\)/);
 });
 
@@ -43,7 +43,7 @@ test('settings retain advanced option warning and existing controls',()=>{
  assert.match(view,/非专业人员请勿修改/);
  assert.match(view,/重启接收服务才会生效/);
  assert.match(view,/aria-label=\{t\(["']最大请求帧率["']\)\}/);
- assert.match(view,/aria-label=\{t\(["']画面亮度["']\)\}/);
+ assert.doesNotMatch(view,/画面亮度|draft\.brightness/);
 });
 
 test('native receiver retains advanced parameter support and UI ownership',()=>{

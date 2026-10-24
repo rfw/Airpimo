@@ -205,27 +205,6 @@ export function AirpimoSettingsDialog({
                 />
               </div>
 
-              <div className="flex items-center justify-between border-b border-border px-px py-2 [&_strong]:block [&_strong]:text-xs [&_strong]:font-semibold [&_small]:mt-1 [&_small]:block [&_small]:text-[10px] [&_small]:text-muted-foreground items-center gap-2.5">
-                <div className="min-w-0">
-                  <strong>{t('画面亮度')}</strong>
-                  <small>{t('重启接收服务后生效')}</small>
-                </div>
-                <div className="flex basis-[128px] items-center gap-1.5 [&_input]:w-[90px] [&_input]:min-w-0 [&_input]:cursor-pointer [&_input]:accent-primary [&_output]:w-[33px] [&_output]:text-right [&_output]:text-[11px] [&_output]:tabular-nums">
-                  <input
-                      aria-label={t("画面亮度")}
-                      type="range"
-                      min={0}
-                      max={100}
-                      step={5}
-                      value={draft.brightness}
-                      onChange={(e) =>
-                          setDraft((x) => ({ ...x, brightness: Number(e.target.value) }))
-                      }
-                  />
-                  <output aria-label={t("当前画面亮度")}>{draft.brightness}%</output>
-                </div>
-              </div>
-
               <div className="flex items-center justify-between border-b border-border px-px py-2 [&_strong]:block [&_strong]:text-xs [&_strong]:font-semibold [&_small]:mt-1 [&_small]:block [&_small]:text-[10px] [&_small]:text-muted-foreground">
                 <div>
                   <strong>{t('启动时开启接收')}</strong>

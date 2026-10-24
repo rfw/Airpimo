@@ -89,26 +89,20 @@ test('FPS and 50% initial volume flow into UxPlay; Windows has software decoder 
 });
 
 
-test('brightness is backed by real UxPlay -vc videobalance and retains Windows A/V sync',()=>{
+test('video uses unmodified brightness and retains watermark, software decoding and sync',()=>{
   const receiver=readFileSync(new URL('../src-tauri/src/receiver.rs', import.meta.url),'utf8');
   const settings=readFileSync(new URL('../src-tauri/src/settings.rs', import.meta.url),'utf8');
-  const app=readFileSync(new URL('../src/App.tsx', import.meta.url),'utf8');
   const settingsDialog=readFileSync(new URL('../src/components/AirpimoSettingsDialog.tsx', import.meta.url),'utf8');
-  const args = readFileSync(new URL('../src-tauri/src/uxplay_args.rs', import.meta.url),'utf8');
-  assert.match(args,/if brightness < 100/);
-  assert.match(args,/videoconvert ! videobalance brightness=/);
+  const args=readFileSync(new URL('../src-tauri/src/uxplay_args.rs', import.meta.url),'utf8');
   assert.match(args,/args\.push\("-vc"\.into\(\)\)/);
-  assert.match(receiver,/applied_brightness: self\.applied_brightness/);
+  assert.match(args,/String::from\("videoconvert"\)/);
+  assert.match(args,/textoverlay text=Airpimo/);
+  assert.doesNotMatch(args,/videobalance|brightness/i);
+  assert.doesNotMatch(settings,/brightness/i);
+  assert.doesNotMatch(receiver,/applied_brightness|settings\.brightness/);
+  assert.doesNotMatch(settingsDialog,/draft\.brightness|画面亮度/);
   assert.match(args,/#\[cfg\(any\(windows, target_os = "macos"\)\)\]\s*push_default\(&mut args, &custom, "-avdec", None\);/);
-  assert.match(receiver,/let effective_args = match crate::uxplay_args::effective\(&name, fps, brightness, &user_args\)/);
+  assert.match(receiver,/uxplay_args::effective\(&name, fps, &user_args\)/);
   assert.match(receiver,/command\.args\(&effective_args\)/);
-  assert.match(settings,/serde\(default = "default_brightness"\)/);
-  assert.match(settings,/pub const fn default_brightness\(\) -> u8 \{ 100 \}/);
-  assert.match(app,/<AirpimoSettingsDialog\b/);
-  assert.match(app,/draft=\{draft\}/);
-  assert.match(app,/setDraft=\{setDraft\}/);
-  assert.match(settingsDialog,/aria-label=\{t\(["']画面亮度["']\)\}\s+type="range"/);
-  assert.match(settingsDialog,/min=\{0\}\s+max=\{100\}\s+step=\{5\}\s+value=\{draft\.brightness\}/);
-  assert.match(settingsDialog,/brightness: Number\(e\.target\.value\)/);
   assert.doesNotMatch(receiver,/"-vsync", "no"\]\);\s*\/\/.*windows/);
 });

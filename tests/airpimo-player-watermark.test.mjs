@@ -13,8 +13,7 @@ test('watermark uses existing UxPlay -vc pipeline, no Tauri overlay or extra win
   assert.match(rust,/xpad=12 ypad=12 font-desc=/);
   assert.match(rust,/color=0x99FFFFFF/);
   assert.match(rust,/draw-shadow=true draw-outline=false shaded-background=false/);
-  assert.match(rust,/if brightness < 100/);
-  assert.match(rust,/converter\.push_str\(&format!\(/);
+  assert.doesNotMatch(rust,/videobalance|brightness/);
   assert.match(rust,/\["-n", "-fps", "-vc", "-nh"\]/);
 });
 

@@ -14,30 +14,17 @@ pub struct Settings {
     pub theme: Theme,
     #[serde(default = "default_fps")]
     pub fps: u16,
-    #[serde(default = "default_brightness")]
-    pub brightness: u8,
     #[serde(default)]
     pub uxplay_args: String,
 }
 pub const fn default_stay_in_tray() -> bool { true }
 pub const fn default_fps() -> u16 { 60 }
-// Relative picture-darkening control, not the physical screen backlight.
-// New installs default to unchanged video brightness (100%). Existing saved values remain unchanged.
-pub const fn default_brightness() -> u8 { 100 }
-pub fn validate_brightness(value: u8) -> Result<(), String> {
-    if value <= 100 { Ok(()) } else { Err("画面亮度必须为 0–100%".into()) }
-}
-// GStreamer videobalance is an offset in [-1, 1], not a linear luminance multiplier.
-// Use a fixed set of numeric digits in the CLI to avoid locale-dependent values.
-pub fn videobalance_brightness(value: u8) -> String {
-    format!("-{:.2}", (100 - value) as f64 / 100.0)
-}
 pub fn validate_fps(value: u16) -> Result<(), String> {
     if (1..=255).contains(&value) { Ok(()) } else { Err("请求帧率必须为 1–255 的整数".into()) }
 }
 impl Default for Settings {
     fn default() -> Self {
-        Self { device_name: "AirPlay".to_string(), auto_start: true, stay_in_tray: true, theme: Theme::System, fps: default_fps(), brightness: default_brightness(), uxplay_args: String::new() }
+        Self { device_name: "AirPlay".to_string(), auto_start: true, stay_in_tray: true, theme: Theme::System, fps: default_fps(), uxplay_args: String::new() }
     }
 }
 pub fn validate_name(value: &str) -> Result<(), String> {
@@ -52,7 +39,7 @@ pub fn validate_name(value: &str) -> Result<(), String> {
 pub fn load(path: &Path) -> (Settings, bool) {
     match fs::read(path) {
         Ok(data) => match serde_json::from_slice::<Settings>(&data) {
-            Ok(value) if validate_name(&value.device_name).is_ok() && validate_fps(value.fps).is_ok() && validate_brightness(value.brightness).is_ok() && crate::uxplay_args::validate(&value.uxplay_args).is_ok() => (value, true),
+            Ok(value) if validate_name(&value.device_name).is_ok() && validate_fps(value.fps).is_ok() && crate::uxplay_args::validate(&value.uxplay_args).is_ok() => (value, true),
             _ => (Settings::default(), false),
         },
         Err(_) => (Settings::default(), true),
@@ -61,7 +48,6 @@ pub fn load(path: &Path) -> (Settings, bool) {
 pub fn save(path: &Path, settings: &Settings) -> Result<(), String> {
     validate_name(&settings.device_name)?;
     validate_fps(settings.fps)?;
-    validate_brightness(settings.brightness)?;
     crate::uxplay_args::validate(&settings.uxplay_args)?;
     let dir = path.parent().ok_or("配置路径无效")?;
     fs::create_dir_all(dir).map_err(|e| format!("创建配置目录失败: {e}"))?;
@@ -86,7 +72,7 @@ mod tests {
     }
     #[test] fn settings_roundtrip() {
         let path = std::env::temp_dir().join(format!("uxplay-setting-{}-test.json", std::process::id()));
-        let data = Settings {device_name:"Office-AirPlay".into(),auto_start:false,stay_in_tray:true,theme:Theme::Dark,fps:120,brightness:65,uxplay_args:"-vol 0.75".into()};
+        let data = Settings {device_name:"Office-AirPlay".into(),auto_start:false,stay_in_tray:true,theme:Theme::Dark,fps:120,uxplay_args:"-vol 0.75".into()};
         save(&path,&data).unwrap();
         let (loaded,valid) = load(&path); assert!(valid); assert_eq!(loaded, data);
         let _=fs::remove_file(path);
@@ -99,7 +85,6 @@ mod tests {
         assert!(!settings.auto_start);
         assert!(settings.stay_in_tray);
         assert_eq!(settings.fps, 60);
-        assert_eq!(settings.brightness, 100);
         assert_eq!(settings.uxplay_args, "");
         // Pre-tray-preference settings and explicitly disabled installs both preserve intent.
         let old = r#"{"device_name":"Old-AirPlay","auto_start":true,"theme":"system"}"#;
@@ -108,15 +93,6 @@ mod tests {
         let off = r#"{"device_name":"Old-AirPlay","auto_start":true,"stay_in_tray":false,"theme":"system"}"#;
         let disabled: Settings = serde_json::from_str(off).unwrap();
         assert!(!disabled.stay_in_tray);
-    }
-    #[test] fn picture_brightness_mapping_and_boundaries() {
-        assert_eq!(default_brightness(), 100);
-        assert_eq!(videobalance_brightness(100), "-0.00");
-        assert_eq!(videobalance_brightness(80), "-0.20");
-        assert_eq!(videobalance_brightness(50), "-0.50");
-        assert_eq!(videobalance_brightness(0), "-1.00");
-        assert!(validate_brightness(100).is_ok());
-        assert!(validate_brightness(101).is_err());
     }
     #[test] fn invalid_fps_is_rejected() {
         assert!(validate_fps(0).is_err());

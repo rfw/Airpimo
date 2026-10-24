@@ -1,7 +1,7 @@
 export type Stage = 'stopped' | 'starting' | 'waiting' | 'connecting' | 'connected' | 'error';
 export type ThemeChoice = 'system' | 'light' | 'dark';
 export type Issue = 'missing_binary' | 'missing_runtime' | 'port_in_use' | 'mdns' | 'audio' | 'video' | 'crash' | 'unknown' | null;
-export interface Settings { device_name: string; auto_start: boolean; stay_in_tray: boolean; theme: ThemeChoice; fps: number; brightness: number; uxplay_args: string; }
+export interface Settings { device_name: string; auto_start: boolean; stay_in_tray: boolean; theme: ThemeChoice; fps: number; uxplay_args: string; }
 export interface Snapshot {
   stage: Stage;
   detail: string;
@@ -9,7 +9,6 @@ export interface Snapshot {
   device_name: string;
   applied_device_name: string | null;
   applied_fps: number | null;
-  applied_brightness: number | null;
   applied_uxplay_args: string | null;
   process_running: boolean;
   discovery_verified: boolean;
@@ -18,8 +17,8 @@ export interface Snapshot {
   restart_attempts: number;
   settings: Settings;
 }
-export const defaultSettings: Settings = {device_name: 'AirPlay', auto_start:true, stay_in_tray:true, theme:'system', fps:60, brightness:100, uxplay_args:''};
-export const defaultSnapshot: Snapshot = {stage:'stopped', detail:'接收服务尚未启动', issue:null, device_name:'Airpimo', applied_device_name:null, applied_fps:null, applied_brightness:null, applied_uxplay_args:null, process_running:false, discovery_verified:false, audio_verified:false, connected_since:null, restart_attempts:0, settings:defaultSettings};
+export const defaultSettings: Settings = {device_name: 'AirPlay', auto_start:true, stay_in_tray:true, theme:'system', fps:60, uxplay_args:''};
+export const defaultSnapshot: Snapshot = {stage:'stopped', detail:'接收服务尚未启动', issue:null, device_name:'Airpimo', applied_device_name:null, applied_fps:null, applied_uxplay_args:null, process_running:false, discovery_verified:false, audio_verified:false, connected_since:null, restart_attempts:0, settings:defaultSettings};
 export const stageTitle: Record<Stage, string> = {
   stopped:'接收已停止', starting:'正在启动', waiting:'等待连接', connecting:'正在连接', connected:'已连接', error:'接收出现问题'
 };
@@ -52,9 +51,6 @@ export function validateDeviceName(value: string): string | null {
 export function validateFps(value: number): string | null {
   return Number.isInteger(value) && value >= 1 && value <= 255 ? null : '最大请求帧率必须为 1–255 的整数';
 }
-export function validateBrightness(value: number): string | null {
-  return Number.isInteger(value) && value >= 0 && value <= 100 ? null : '画面亮度必须为 0–100%';
-}
 export function validateUxplayArgs(value: string): string | null {
   if (new TextEncoder().encode(value).length > 2048) return 'UxPlay 参数最多 2048 字节';
   if (/[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f]/.test(value)) return 'UxPlay 参数不能包含不支持的控制字符';
@@ -64,7 +60,6 @@ export function showRestartPrompt(s: Snapshot) {
   return s.process_running && (
     (s.applied_device_name !== null && s.settings.device_name !== s.applied_device_name) ||
     (s.applied_fps !== null && s.settings.fps !== s.applied_fps) ||
-    (s.applied_brightness !== null && s.settings.brightness !== s.applied_brightness) ||
     (s.applied_uxplay_args !== null && s.settings.uxplay_args !== s.applied_uxplay_args)
   );
 }

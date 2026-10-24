@@ -1,4 +1,4 @@
-// Airpimo owns these settings: receiver name, requested FPS and picture brightness.
+// Airpimo owns these settings: receiver name and requested FPS.
 // Expert-supplied arguments take precedence over *built-in defaults*, never over
 // explicit UI settings. The process is launched directly, without a shell.
 
@@ -73,7 +73,7 @@ pub fn advertised_name(name: &str) -> String {
 
 /// Build the canonical effective argv; never depend on UxPlay's behavior with
 /// duplicate flags. Explicit UI-owned flags are always applied once at the end.
-pub fn effective(name: &str, fps: u16, brightness: u8, user: &str) -> Result<Vec<String>, String> {
+pub fn effective(name: &str, fps: u16, user: &str) -> Result<Vec<String>, String> {
     let custom = parse(user)?;
     let mut args = Vec::new();
     push_default(&mut args, &custom, "-d", Some("1"));
@@ -95,15 +95,9 @@ pub fn effective(name: &str, fps: u16, brightness: u8, user: &str) -> Result<Vec
     // -vc replaces the video conversion stage of UxPlay's native GStreamer
     // pipeline. The watermark is composited into decoded VIDEO frames only:
     // no Tauri overlay, no additional native window, no encoded-stream changes.
-    // Keep videobalance ahead of the watermark so a dimmed video does not dim
-    // the Airpimo label. Always provide -vc, including brightness=100%.
+    // Preserve decoded video without applying a picture-level adjustment.
+    // Retain the Airpimo watermark in the canonical -vc pipeline.
     let mut converter = String::from("videoconvert");
-    if brightness < 100 {
-        converter.push_str(&format!(
-            " ! videobalance brightness={}",
-            crate::settings::videobalance_brightness(brightness)
-        ));
-    }
     converter.push_str(concat!(
         " ! textoverlay text=Airpimo halignment=right valignment=bottom",
         " xpad=12 ypad=12 font-desc=\"Sans 14\" color=0x99FFFFFF",
@@ -137,7 +131,7 @@ mod tests {
     }
     #[test]
     fn explicit_settings_override_custom_but_custom_overrides_defaults() {
-        let args = effective("Airpimo", 60, 80, "-n Evil -fps 240 -vc wrong -vol 0.9 -d 2").unwrap();
+        let args = effective("Airpimo", 60, "-n Evil -fps 240 -vc wrong -vol 0.9 -d 2").unwrap();
         let strings = args.iter().map(String::as_str).collect::<Vec<_>>();
         assert_eq!(strings.iter().filter(|&&s| s == "-n").count(), 1);
         assert_eq!(strings.iter().filter(|&&s| s == "-fps").count(), 1);
@@ -150,24 +144,26 @@ mod tests {
         assert_eq!(strings.windows(2).find(|s| s[0] == "-fps").unwrap()[1], "60");
     }
     #[test]
-    fn watermark_is_present_at_full_brightness_and_custom_converter_cannot_replace_it() {
-        let args = effective("Room", 100, 100, "-vc=bad -vol=0.7").unwrap();
+    fn watermark_is_present_and_custom_converter_cannot_replace_it() {
+        let args = effective("Room", 100, "-vc=bad -vol=0.7").unwrap();
         let converters = args.windows(2).filter(|pair| pair[0] == "-vc").collect::<Vec<_>>();
         assert_eq!(converters.len(), 1);
-        assert!(!converters[0][1].contains("videobalance"));
+        assert!(converters[0][1].starts_with("videoconvert ! textoverlay"));
         assert!(converters[0][1].contains("textoverlay text=Airpimo"));
         assert!(converters[0][1].contains("font-desc=\"Sans 14\""));
         assert!(!args.iter().any(|x| x.contains("bad")));
         assert!(args.contains(&"-vol=0.7".to_string()));
     }
     #[test]
-    fn brightness_control_and_bottom_right_watermark_are_composed_in_order() {
-        let args = effective("Room", 60, 75, "").unwrap();
+    fn unaltered_video_and_bottom_right_watermark_are_composed_in_order() {
+        let args = effective("Room", 60, "").unwrap();
         let pipeline = args.windows(2).find(|pair| pair[0] == "-vc").unwrap()[1].as_str();
-        assert!(pipeline.starts_with("videoconvert ! videobalance brightness=-0.25 ! textoverlay"));
+        assert!(pipeline.starts_with("videoconvert ! textoverlay"));
+        assert!(pipeline.starts_with("videoconvert ! textoverlay"));
         for key in ["halignment=right", "valignment=bottom", "xpad=12", "ypad=12", "color=0x99FFFFFF"] {
             assert!(pipeline.contains(key), "missing {key}");
         }
         assert_eq!(args.iter().filter(|item| item.as_str() == "-vc").count(), 1);
     }
+
 }

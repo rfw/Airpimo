@@ -13,10 +13,10 @@ test('AirPlay device name always has @Airpimo suffix exactly once, with -nh',()=
   assert.match(args, /\["-n", "-fps", "-vc", "-nh"\]/);
   assert.match(home,/const name = `\$\{baseName\.replace\(/);
 });
-test('new settings use brightness 100% while previous user values are preserved',()=>{
-  assert.match(read('src/domain/state.ts'),/brightness:100, uxplay_args/);
-  assert.match(read('src-tauri/src/settings.rs'),/pub const fn default_brightness\(\) -> u8 \{ 100 \}/);
-  assert.match(read('src-tauri/src/settings.rs'),/settings::|pub fn load\(path:/);
+test('settings no longer expose or persist picture brightness',()=>{
+  assert.doesNotMatch(read('src/domain/state.ts'),/brightness/i);
+  assert.doesNotMatch(read('src-tauri/src/settings.rs'),/brightness/i);
+  assert.doesNotMatch(read('src-tauri/src/uxplay_args.rs'),/videobalance|brightness/i);
 });
 test('published and locally built Windows 10/11 installer names agree',()=>{
   assert.match(read('scripts/ci/prepare-release-assets.mjs'),/name:'windows10-11-x64'/);
