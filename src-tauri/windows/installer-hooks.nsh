@@ -11,7 +11,7 @@
     ClearErrors
     FileOpen $R9 "$PLUGINSDIR\airpimo-cleanup.ps1" w
     ${If} ${Errors}
-      MessageBox MB_ICONSTOP|MB_OK "Airpimo cannot create the installer cleanup helper."
+      MessageBox MB_ICONSTOP|MB_OK "$(airpimoCleanupCreateError)"
       Abort
     ${EndIf}
     FileWriteUTF16LE /BOM $R9 ""
@@ -74,13 +74,13 @@
     FileWriteUTF16LE $R9 "exit 5$\r$\n"
     ${If} ${Errors}
       FileClose $R9
-      MessageBox MB_ICONSTOP|MB_OK "Airpimo cannot write the installer cleanup helper."
+      MessageBox MB_ICONSTOP|MB_OK "$(airpimoCleanupWriteError)"
       Abort
     ${EndIf}
     FileClose $R9
     System::Call 'kernel32::SetEnvironmentVariableW(w "AIRPIMO_INSTALL_DIR", w "$INSTDIR") i .r0'
     ${If} $0 = 0
-      MessageBox MB_ICONSTOP|MB_OK "Airpimo could not verify the install location. Close the installer."
+      MessageBox MB_ICONSTOP|MB_OK "$(airpimoCleanupLocationError)"
       Abort
     ${EndIf}
     nsExec::ExecToStack '"$WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\airpimo-cleanup.ps1"'
@@ -89,7 +89,7 @@
     Delete "$PLUGINSDIR\airpimo-cleanup.ps1"
     ${If} $0 != "0"
       DetailPrint "Airpimo scoped cleanup failed: exit=$0; output=$1"
-      MessageBox MB_ICONSTOP|MB_OK "Unable to stop Airpimo processes in $INSTDIR. Close Airpimo and Airpimo Player and retry."
+      MessageBox MB_ICONSTOP|MB_OK "$(airpimoCleanupProcessError)"
       Abort
     ${EndIf}
   ${Else}

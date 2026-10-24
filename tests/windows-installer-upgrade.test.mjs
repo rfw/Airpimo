@@ -25,6 +25,14 @@ const sample = `!include "utils.nsh"
     \${EndIf}
   reinst_uninstall:
     HideWindow
+;Languages
+{{#each languages}}
+!insertmacro MUI_LANGUAGE "{{this}}"
+{{/each}}
+!insertmacro MUI_RESERVEFILE_LANGDLL
+{{#each language_files}}
+  !include "{{this}}"
+{{/each}}
 ` + 'X'.repeat(25100);
 
 test('same-version reinstall cleans first, and upgrade cleanup precedes legacy uninstaller',()=>{

@@ -9,7 +9,7 @@ import {pathToFileURL} from 'node:url';
 
 export const UPSTREAM = 'https://raw.githubusercontent.com/tauri-apps/tauri/tauri-v2.11.1/crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi';
 export const TARGET = resolve(import.meta.dirname, '../src-tauri/windows/airpimo-installer.nsi');
-export const SIGNATURE = '; AIRPIMO_CUSTOM_TAURI_2_11_1_INSTALLER_V2';
+export const SIGNATURE = '; AIRPIMO_CUSTOM_TAURI_2_11_1_INSTALLER_V3';
 function replaceOnce(source, before, after, label) {
   const count = source.split(before).length - 1;
   if(count !== 1) throw Error(`Pinned Tauri NSIS template drift: ${label} (${count} matches)`);
@@ -61,6 +61,26 @@ export function customizeNsis(upstream) {
     \${Else}                    ; Explicit in-place reinstall
       Goto reinst_done
     \${EndIf}`, 'same-version action');
+  // Tauri emits MUI_LANGUAGE and its own language files here. Declare our
+  // hook messages AFTER MUI_LANGUAGE, not in the early-included hooks file.
+  // The locked template must contain the precise anchor or packaging fails.
+  s = replaceOnce(s,
+`{{#each language_files}}
+  !include "{{this}}"
+{{/each}}`,
+`{{#each language_files}}
+  !include "{{this}}"
+{{/each}}
+; Airpimo custom installer/uninstaller messages (both architectures).
+LangString airpimoCleanupCreateError \${LANG_ENGLISH} "Airpimo cannot create the installer cleanup helper."
+LangString airpimoCleanupCreateError \${LANG_SIMPCHINESE} "无法创建 Airpimo 安装程序的清理辅助脚本。"
+LangString airpimoCleanupWriteError \${LANG_ENGLISH} "Airpimo cannot write the installer cleanup helper."
+LangString airpimoCleanupWriteError \${LANG_SIMPCHINESE} "无法写入 Airpimo 安装程序的清理辅助脚本。"
+LangString airpimoCleanupLocationError \${LANG_ENGLISH} "Airpimo could not verify the install location. Close the installer."
+LangString airpimoCleanupLocationError \${LANG_SIMPCHINESE} "无法验证 Airpimo 的安装位置，请关闭安装程序。"
+LangString airpimoCleanupProcessError \${LANG_ENGLISH} "Unable to stop Airpimo processes in $INSTDIR. Close Airpimo and Airpimo Player and retry."
+LangString airpimoCleanupProcessError \${LANG_SIMPCHINESE} "无法停止 $INSTDIR 中的 Airpimo 进程。请关闭 Airpimo 和 Airpimo Player 后重试。"`,
+    'localized cleanup messages');
   // Tauri's first radio is checked by default; on upgrade it already means
   // uninstall-before-install. The above aligns same-version repairs with it.
   s = replaceOnce(s,

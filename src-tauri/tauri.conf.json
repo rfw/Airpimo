@@ -56,7 +56,11 @@
         "startMenuFolder": "Airpimo",
         "installerIcon": "icons/installer.ico",
         "template": "./windows/airpimo-installer.nsi",
-        "installerHooks": "./windows/installer-hooks.nsh"
+        "installerHooks": "./windows/installer-hooks.nsh",
+        "languages": [
+          "English",
+          "SimpChinese"
+        ]
       },
       "webviewInstallMode": {
         "type": "downloadBootstrapper"
