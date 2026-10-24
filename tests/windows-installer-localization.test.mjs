@@ -63,9 +63,12 @@ test('pinned NSIS template emits bilingual messages after languages, and old cac
 {{#each language_files}}
   !include "{{this}}"
 {{/each}}
+Function RunMainBinary
+  nsis_tauri_utils::RunAsUser "$INSTDIR\\\${MAINBINARYNAME}.exe" ""
+FunctionEnd
 `+'X'.repeat(25100);
   const generated=customizeNsis(sample);
-  assert.match(SIGNATURE,/INSTALLER_V4/);
+  assert.match(SIGNATURE,/INSTALLER_V5/);
   assert.ok(generated.indexOf('!insertmacro MUI_LANGUAGE') < generated.indexOf('LangString airpimoCleanupCreateError'));
   for(const name of ['CreateError','WriteError','LocationError','ProcessError']){
     for(const lang of ['ENGLISH','SIMPCHINESE']){

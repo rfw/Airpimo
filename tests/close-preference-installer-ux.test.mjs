@@ -31,6 +31,9 @@ const sourceSample = `!include "utils.nsh"
 {{#each language_files}}
   !include "{{this}}"
 {{/each}}
+Function RunMainBinary
+  nsis_tauri_utils::RunAsUser "$INSTDIR\\\${MAINBINARYNAME}.exe" ""
+FunctionEnd
 ` + 'X'.repeat(25100);
 
 test('tray feedback remains in a fixed-height accessible row and success stays readable', () => {
@@ -61,7 +64,7 @@ test('Win7 maintenance action shows preparation banner before synchronous cleanu
   const generated = customizeNsis(sourceSample);
   const hooks = read('src-tauri/windows/installer-hooks.nsh');
   const phase = generated.split('  reinst_uninstall:')[1].split('    HideWindow')[0];
-  assert.match(SIGNATURE, /INSTALLER_V4/);
+  assert.match(SIGNATURE, /INSTALLER_V5/);
   assert.ok(phase.indexOf('Banner::show') < phase.indexOf('!insertmacro AIRPIMO_STOP_INSTALLED_PROCESSES'));
   assert.ok(phase.indexOf('!insertmacro AIRPIMO_STOP_INSTALLED_PROCESSES') < phase.indexOf('!insertmacro AIRPIMO_DISMISS_PREPARATION_BANNER'));
   assert.match(generated, /LangString airpimoPreparingUninstall \$\{LANG_SIMPCHINESE\}/);

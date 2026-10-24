@@ -9,7 +9,7 @@ import {pathToFileURL} from 'node:url';
 
 export const UPSTREAM = 'https://raw.githubusercontent.com/tauri-apps/tauri/tauri-v2.11.1/crates/tauri-bundler/src/bundle/windows/nsis/installer.nsi';
 export const TARGET = resolve(import.meta.dirname, '../src-tauri/windows/airpimo-installer.nsi');
-export const SIGNATURE = '; AIRPIMO_CUSTOM_TAURI_2_11_1_INSTALLER_V4';
+export const SIGNATURE = '; AIRPIMO_CUSTOM_TAURI_2_11_1_INSTALLER_V5';
 function replaceOnce(source, before, after, label) {
   const count = source.split(before).length - 1;
   if(count !== 1) throw Error(`Pinned Tauri NSIS template drift: ${label} (${count} matches)`);
@@ -81,7 +81,11 @@ LangString airpimoCleanupLocationError \${LANG_SIMPCHINESE} "无法验证 Airpim
 LangString airpimoCleanupProcessError \${LANG_ENGLISH} "Unable to stop Airpimo processes in $INSTDIR. Close Airpimo and Airpimo Player and retry."
 LangString airpimoCleanupProcessError \${LANG_SIMPCHINESE} "无法停止 $INSTDIR 中的 Airpimo 进程。请关闭 Airpimo 和 Airpimo Player 后重试。"
 LangString airpimoPreparingUninstall \${LANG_ENGLISH} "Stopping Airpimo and preparing the previous version for removal..."
-LangString airpimoPreparingUninstall \${LANG_SIMPCHINESE} "正在关闭 Airpimo 并准备卸载旧版本，请稍候…"`,
+LangString airpimoPreparingUninstall \${LANG_SIMPCHINESE} "正在关闭 Airpimo 并准备卸载旧版本，请稍候…"
+LangString airpimoLaunchMissing \${LANG_ENGLISH} "Airpimo.exe was not found in $INSTDIR. Please reinstall Airpimo."
+LangString airpimoLaunchMissing \${LANG_SIMPCHINESE} "在 $INSTDIR 中找不到 Airpimo.exe，请重新安装 Airpimo。"
+LangString airpimoLaunchFailed \${LANG_ENGLISH} "Airpimo installed successfully, but Windows could not launch it automatically. Open Airpimo from the Start menu or the installation folder."
+LangString airpimoLaunchFailed \${LANG_SIMPCHINESE} "Airpimo 已安装成功，但 Windows 无法自动启动。请从开始菜单或安装目录手动打开。"`,
     'localized cleanup messages');
   // Tauri's first radio is checked by default; on upgrade it already means
   // uninstall-before-install. The above aligns same-version repairs with it.
@@ -102,6 +106,36 @@ LangString airpimoPreparingUninstall \${LANG_SIMPCHINESE} "正在关闭 Airpimo 
       !insertmacro AIRPIMO_DISMISS_PREPARATION_BANNER
     \${EndIf}
     HideWindow`, 'old-uninstaller cleanup');
+  // Tauri's finish-page RunAsUser returns a stack status (0 success, 1 failure).
+  // Preserve the default non-elevated launch, and make failures visible.
+  s = replaceOnce(s,
+`Function RunMainBinary
+  nsis_tauri_utils::RunAsUser "$INSTDIR\\\${MAINBINARYNAME}.exe" ""
+FunctionEnd`,
+`Function RunMainBinary
+  ; The finish-page checkbox controls whether this function is called.
+  \${IfNot} \${FileExists} "$INSTDIR\\\${MAINBINARYNAME}.exe"
+    MessageBox MB_ICONEXCLAMATION|MB_OK "$(airpimoLaunchMissing)"
+    Return
+  \${EndIf}
+  nsis_tauri_utils::RunAsUser "$INSTDIR\\\${MAINBINARYNAME}.exe" ""
+  Pop $R0
+  \${If} $R0 != 0
+    ; Only for currentUser builds and only if this installer is NOT elevated.
+    ; Never launch the application as administrator from the Win7 installer.
+    !if "\${INSTALLMODE}" == "currentUser"
+      System::Call 'shell32::IsUserAnAdmin() i .r1'
+      \${If} $1 == 0
+        ClearErrors
+        ExecShell "open" "$INSTDIR\\\${MAINBINARYNAME}.exe"
+        \${IfNot} \${Errors}
+          Return
+        \${EndIf}
+      \${EndIf}
+    !endif
+    MessageBox MB_ICONEXCLAMATION|MB_OK "$(airpimoLaunchFailed)"
+  \${EndIf}
+FunctionEnd`, 'finish-page RunAsUser handling');
   return SIGNATURE + '\n; Derived from tauri-v2.11.1, preserving original handlebars placeholders.\n' + s;
 }
 function download(url, redirect = 0) {
@@ -118,7 +152,7 @@ function download(url, redirect = 0) {
 export async function prepareWindowsNsis({platform=process.platform,target=TARGET,sourcePath=process.env.AIRPIMO_TAURI_NSIS_TEMPLATE_SOURCE}={}) {
   if(platform!=='win32') return false;
   if(existsSync(target) && readFileSync(target,'utf8').startsWith(SIGNATURE)) {
-    if (!readFileSync(target,'utf8').includes('AIRPIMO_STOP_INSTALLED_PROCESSES')) throw Error('Generated NSIS template is incomplete');
+    if (!readFileSync(target,'utf8').includes('AIRPIMO_STOP_INSTALLED_PROCESSES') || !readFileSync(target,'utf8').includes('airpimoLaunchFailed')) throw Error('Generated NSIS template is incomplete');
     return false;
   }
   const source=sourcePath?readFileSync(sourcePath,'utf8'):await download(UPSTREAM);

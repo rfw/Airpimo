@@ -33,6 +33,9 @@ const sample = `!include "utils.nsh"
 {{#each language_files}}
   !include "{{this}}"
 {{/each}}
+Function RunMainBinary
+  nsis_tauri_utils::RunAsUser "$INSTDIR\\\${MAINBINARYNAME}.exe" ""
+FunctionEnd
 ` + 'X'.repeat(25100);
 
 test('same-version reinstall cleans first, and upgrade cleanup precedes legacy uninstaller',()=>{
