@@ -54,6 +54,8 @@ struct Inner {
     detail: String,
     issue: Option<&'static str>,
     child: Option<Child>,
+    #[cfg(windows)]
+    receiver_job: Option<crate::windows_job::ReceiverJob>,
     epoch: u64,
     stopping: bool,
     restart_attempts: u8,
@@ -108,6 +110,7 @@ impl Controller {
         if !valid { logs.push_back(format!("{} | invalid_settings_reset", unix_now())); }
         Arc::new(Self { inner: Mutex::new(Inner {
             settings, stage:"stopped", detail:"接收服务已停止".into(), issue:None, child:None,
+            #[cfg(windows)] receiver_job:None,
             epoch:0, stopping:true, restart_attempts:0, applied_device_name:None, applied_fps:None, applied_brightness:None, applied_uxplay_args:None,
             connected_since:None, started_at:None, connecting_at:None, logs, power_inhibitor:None,
         }), settings_path })
@@ -151,13 +154,17 @@ impl Controller {
             inner.logs.iter().cloned().collect::<Vec<_>>().join("\n"))
     }
     pub fn stop(self: &Arc<Self>, app: &AppHandle) -> Snapshot {
-        let child = {
+        let (child, receiver_job) = {
             let mut i=self.inner.lock().unwrap();
             i.stopping=true; i.epoch+=1; i.stage="stopped"; i.detail="接收服务已停止".into();
             i.issue=None; i.connected_since=None; i.connecting_at=None; i.applied_device_name=None; i.applied_fps=None; i.applied_brightness=None; i.applied_uxplay_args=None; i.restart_attempts=0;
-            i.log("stopped_by_user"); i.power_inhibitor = None; i.child.take()
+            i.log("stopped_by_user"); i.power_inhibitor = None;
+            #[cfg(windows)] let job=i.receiver_job.take();
+            #[cfg(not(windows))] let job=();
+            (i.child.take(),job)
         };
         if let Some(mut child) = child { let _ = child.kill(); let _ = child.wait(); }
+        drop(receiver_job); // Close the Job Object after the parent exits.
         self.publish(app);
         self.snapshot()
     }
@@ -206,6 +213,17 @@ impl Controller {
             Ok(child)=>child,
             Err(err)=>{ self.error(app,epoch,"missing_binary", &format!("UxPlay 无法启动：{err}")); return self.snapshot(); }
         };
+        // Fail closed: never run an unmanaged Windows receiver. Windows 7 does
+        // not support nested jobs; report that environment incompatibility.
+        #[cfg(windows)]
+        let job = match crate::windows_job::ReceiverJob::attach(&child) {
+            Ok(job)=>job,
+            Err(err)=>{
+                let _=child.kill(); let _=child.wait();
+                self.error(app,epoch,"missing_runtime",&format!("Windows 无法托管 UxPlay 进程树：{err}"));
+                return self.snapshot();
+            }
+        };
         // Only observe video windows owned by the newly spawned UxPlay child.
         // No global Windows message hooks or user input capture is installed.
         #[cfg(windows)]
@@ -214,6 +232,7 @@ impl Controller {
         {
             let mut i=self.inner.lock().unwrap();
             if i.epoch != epoch || i.stopping { let _=child.kill(); let _=child.wait(); return i.snapshot(); }
+            #[cfg(windows)] { i.receiver_job=Some(job); }
             i.child=Some(child); i.applied_device_name=Some(name); i.applied_fps=Some(fps); i.applied_brightness=Some(brightness); i.applied_uxplay_args=Some(user_args);
             if dev_binary { i.log("development_local_binary_unbundled_gstreamer"); }
             i.log("sidecar_spawned_discovery_unverified");
@@ -322,7 +341,9 @@ impl Controller {
         let retry_delay = {
             let mut i=self.inner.lock().unwrap();
             if i.epoch!=epoch || i.stopping {return;}
-            i.power_inhibitor = None; i.child.take(); i.connected_since=None; i.connecting_at=None; i.applied_device_name=None; i.applied_fps=None; i.applied_brightness=None; i.applied_uxplay_args=None;
+            i.power_inhibitor = None; i.child.take();
+            #[cfg(windows)] { i.receiver_job.take(); }
+            i.connected_since=None; i.connecting_at=None; i.applied_device_name=None; i.applied_fps=None; i.applied_brightness=None; i.applied_uxplay_args=None;
             if i.started_at.map(|t| t.elapsed() > Duration::from_secs(60)).unwrap_or(false) { i.restart_attempts=0; }
             i.restart_attempts=i.restart_attempts.saturating_add(1);
             i.stage="error";

@@ -64,6 +64,14 @@ test('PE reader rejects corrupt header and truncated file',()=>{
   const broken=pe({dll:'KERNEL32.dll'});broken.writeUInt32LE(0xfffffff0,0x84+20+112+8);
   assert.throws(()=>parsePE(broken),/invalid PE/);
 });
+test('Win7 import audit accepts the Windows-provided opengl32.dll without bundling it',()=>sandbox(root=>{
+ const manifest=fixture(root,{...roots,
+  'gstreamer/lib/gstreamer-1.0/libgstlibav.dll':pe({dll:'opengl32.dll',imported:'glGetString'}),
+ });
+ const result=auditWin7Runtime(root,manifest);
+ assert.equal(result.ok,true,result.problems.join('\n'));
+ assert.equal(manifest.files.some(item=>item.path.endsWith('/opengl32.dll')),false);
+}));
 test('Win7 gate rejects transitive dependency importing WaitOnAddress',()=>sandbox(root=>{
   const manifest=fixture(root,{...roots,
     'gstreamer/lib/gstreamer-1.0/libgstlibav.dll':pe({dll:'avcodec-63.dll',imported:'my_codec_api'}),

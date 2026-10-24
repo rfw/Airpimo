@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {resolve} from 'node:path';
 import {preserveNsisInstaller} from './windows-build-artifacts.mjs';
+import {prepareWindowsNsis} from './prepare-windows-nsis.mjs';
 const root=resolve(import.meta.dirname,'..');
 const mdnsRequired=process.argv.includes('--require-mdns');
 function block(s){console.error(`[win7] BLOCKED: ${s}`);process.exit(2);}
@@ -21,6 +22,7 @@ for(const [program,args] of [
   const r=spawnSync(program,args,{cwd:root,stdio:'inherit',windowsHide:true});
   if(r.error||r.status!==0)block(`${args.join(' ')} failed; no installer generated`);
 }
+try { await prepareWindowsNsis(); } catch(error) { block(`Installer template preparation failed: ${error.message}`); }
 const started=Date.now();
 const build=spawnSync('cmd.exe',['/d','/s','/c','npx tauri build --config src-tauri/tauri.win7.conf.json --bundles nsis'],{cwd:root,stdio:'inherit',windowsHide:true});
 if(build.error||build.status!==0)block('Tauri NSIS build failed');

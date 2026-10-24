@@ -42,9 +42,9 @@ test('Windows double-click and macOS left-click restore main without changing qu
   assert.match(lib,/"quit"=>\{controller\(app\)\.stop\(app\);app\.exit\(0\);\}/);
 });
 
-test('native package configuration stays unchanged; reuse Tauri upgrade prompt',()=> {
+test('NSIS uses the pinned Airpimo clean-upgrade template and shared process cleanup hooks',()=> {
   const conf=JSON.parse(file('src-tauri/tauri.conf.json'));
   assert.equal(conf.bundle.windows.nsis.displayLanguageSelector,false);
-  assert.equal(conf.bundle.windows.nsis.template,undefined);
-  assert.equal(conf.bundle.windows.nsis.installerHooks,undefined);
+  assert.equal(conf.bundle.windows.nsis.template,'./windows/airpimo-installer.nsi');
+  assert.equal(conf.bundle.windows.nsis.installerHooks,'./windows/installer-hooks.nsh');
 });

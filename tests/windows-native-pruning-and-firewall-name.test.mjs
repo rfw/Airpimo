@@ -58,6 +58,17 @@ test('Windows pruning rejects a missing required decoder without deleting anythi
  assert.equal(existsSync(join(f.root,'gstreamer/bin/libunrelated.dll')),true);
  assert.equal(JSON.parse(readFileSync(join(f.root,'native-manifest.json'),'utf8')).ready,true);
 }));
+test('Windows pruning treats Win7 OpenGL32 as an OS DLL, not an unbundled runtime dependency',()=>fixture(f=>{
+ const parse=buffer=>{
+  const original=f.parse(buffer);
+  if(buffer.toString().includes('libgstcoreelements.dll'))original.imports.set('opengl32.dll',new Set(['glGetString']));
+  return original;
+ };
+ const plan=planWindowsPrune(f.root,{...f,parse});
+ assert.equal(plan.ok,true,plan.problems.join('\n'));
+ assert.equal(plan.problems.some(p=>p.includes('opengl32.dll')),false);
+ assert.ok(plan.kept.includes('gstreamer/lib/gstreamer-1.0/libgstcoreelements.dll'));
+}));
 test('Windows pruning blocks unbundled non-system DLLs and fails closed',()=>fixture(f=>{
  const parse=buffer=>{
   const original=f.parse(buffer);

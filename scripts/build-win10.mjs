@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {resolve} from 'node:path';
 import {preserveNsisInstaller} from './windows-build-artifacts.mjs';
+import {prepareWindowsNsis} from './prepare-windows-nsis.mjs';
 const root=resolve(import.meta.dirname,'..');
 function block(reason) {console.error(`[win10+] BLOCKED: ${reason}`);process.exit(2)}
 if(process.platform!=='win32'||process.arch!=='x64') block('Run on a Windows x64 build host.');
@@ -20,6 +21,7 @@ for(const args of [['scripts/check-native.mjs'],['scripts/check-tauri-lock.mjs']
   if(run.error||run.status!==0) block(`${args.join(' ')} failed; no installer generated`);
 }
 // Explicitly select the modern Windows config; the Win7 override must never be used.
+try { await prepareWindowsNsis(); } catch(error) { block(`Installer template preparation failed: ${error.message}`); }
 const started=Date.now();
 const build=spawnSync('cmd.exe',['/d','/s','/c','npx tauri build --config src-tauri/tauri.conf.json --bundles nsis'],
   {cwd:root,stdio:'inherit',windowsHide:true});

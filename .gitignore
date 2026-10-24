@@ -40,3 +40,6 @@ ci-input/
 
 .idea
 .vscode
+
+# Generated from a pinned Tauri 2.11.1 template (first Windows build)
+/src-tauri/windows/airpimo-installer.nsi

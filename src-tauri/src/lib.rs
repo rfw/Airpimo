@@ -5,6 +5,8 @@ mod settings;
 mod uxplay_args;
 #[cfg(windows)]
 mod windows_player;
+#[cfg(windows)]
+mod windows_job;
 
 use std::{path::PathBuf, sync::Arc};
 use receiver::{Controller, Snapshot};
