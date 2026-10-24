@@ -1,6 +1,6 @@
 import { useI18n } from "../lib/i18n-react";
 import { useState, type Dispatch, type SetStateAction } from "react";
-import { ExternalLink, Github, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, Download, ExternalLink, Github, RefreshCw, X } from "lucide-react";
 import airpimoIcon from "../../src-tauri/icons/128x128.png";
 import { brand } from "../brand";
 import { Button } from "./ui/button";
@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dial
 import type { Settings, ThemeChoice } from "../domain/state";
 import type { ReleaseStatus } from "../lib/release-update";
 
-export type SettingsTab = "config" | "theme" | "updates" | "about" | "diagnostics";
+export type SettingsTab = "config" | "theme" | "about" | "diagnostics";
 
 interface SettingsDialogProps {
   settingsOpen: boolean;
@@ -117,7 +117,7 @@ export function AirpimoSettingsDialog({
           </div>
 
           <div
-              className="grid shrink-0 grid-cols-5 gap-1 border-b border-border pb-2"
+              className="grid shrink-0 grid-cols-4 gap-1 border-b border-border pb-2"
               role="tablist"
               aria-label={t("设置选项卡")}
           >
@@ -125,7 +125,6 @@ export function AirpimoSettingsDialog({
                 [
                   ["config", t("配置")],
                   ["theme", t("界面")],
-                  ["updates", t("升级")],
                   ["about", t("关于")],
                   ["diagnostics", t("诊断")],
                 ] as const
@@ -142,7 +141,12 @@ export function AirpimoSettingsDialog({
                     className="whitespace-nowrap rounded-[7px] border-0 bg-transparent px-0.5 py-2 text-xs font-semibold text-muted-foreground aria-selected:bg-muted aria-selected:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary [@media(max-height:390px)]:py-[5px]"
                 >
                   {label}
-                  {value === "updates" && updateResult?.kind === "available" ? " •" : ""}
+                  {value === "about" && updateResult?.kind === "available" && (
+                    <span
+                        aria-label={t("发现新版本")}
+                        className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-primary align-middle"
+                    />
+                  )}
                 </button>
             ))}
           </div>
@@ -348,90 +352,112 @@ export function AirpimoSettingsDialog({
             </section>
 
             <section
-                id="airpimo-panel-updates"
-                role="tabpanel"
-                aria-labelledby="airpimo-tab-updates"
-                hidden={settingsTab !== "updates"}
-                className={panelClasses("updates")}
-            >
-              <div className="flex items-center justify-between border-b border-border px-px py-2 [&_strong]:block [&_strong]:text-xs [&_strong]:font-semibold [&_small]:mt-1 [&_small]:block [&_small]:text-[10px] [&_small]:text-muted-foreground">
-                <div>
-                  <strong>{t('当前版本')}</strong>
-                  <small>Airpimo v{brand.version}</small>
-                </div>
-              </div>
-              <div
-                  className={`my-2.5 break-words rounded-lg border border-border bg-muted px-3 py-2.5 text-xs leading-normal ${updateResult?.kind === "error" ? "text-destructive" : ""}`}
-                  role="status"
-                  aria-live="polite"
-              >
-                {updateChecking
-                    ? t("正在检查更新…")
-                    : !updateResult
-                        ? t("尚未检查更新")
-                        : updateResult.kind === "available"
-                            ? `${t("发现新版本")} ${updateResult.latest}`
-                            : updateResult.kind === "latest"
-                                ? `${t("已是最新版本")} (v${updateResult.current})`
-                                : t(updateResult.message)}
-              </div>
-              <div className="mt-2.5 flex flex-wrap gap-2">
-                <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => void runUpdateCheck()}
-                    disabled={updateChecking}
-                >
-                  {updateChecking ? t("检查中…") : t("检查更新")}
-                </Button>
-                {updateResult?.kind === "available" && (
-                    <Button
-                        type="button"
-                        onClick={() => void openRelease()}
-                        disabled={releaseOpening}
-                    >
-                      {releaseOpening ? t("打开中…") : t("下载")}
-                    </Button>
-                )}
-              </div>
-            </section>
-
-            <section
                 id="airpimo-panel-about"
                 role="tabpanel"
                 aria-labelledby="airpimo-tab-about"
                 hidden={settingsTab !== "about"}
                 className={panelClasses("about")}
             >
-              <div className="flex flex-col items-center pb-5 pt-2 text-center">
-                <img src={airpimoIcon} alt={t("Airpimo 应用图标")} className="h-16 w-16 object-contain" />
-                <h2 className="mt-2 text-lg font-semibold tracking-tight">Airpimo</h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">{t("版本")} v{brand.version}</p>
-                <p className="mt-3 text-xs text-muted-foreground">{t('轻量、开源的 AirPlay 接收工具')}</p>
-                <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{t('支持将 iPhone / iPad 屏幕投射到电脑')}</p>
-              </div>
-              <div className="divide-y divide-border border-y border-border">
-                <button
-                    type="button"
-                    onClick={onProject}
-                    className="flex w-full items-center justify-between gap-3 bg-transparent px-px py-3 text-left hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                    aria-label={t("打开 GitHub 项目主页")}
-                >
-                  <span className="flex min-w-0 items-center gap-2.5">
-                    <Github size={17} strokeWidth={1.8} aria-hidden="true" />
-                    <span className="min-w-0">
-                      <strong className="block text-xs font-semibold">GitHub</strong>
-                      <small className="mt-1 block break-all text-[10px] text-muted-foreground">github.com/rfw/Airpimo</small>
+              <div className="mx-auto w-full max-w-[520px]">
+                <header className="flex items-center gap-3 px-1 pb-3 pt-1">
+                  <img
+                      src={airpimoIcon}
+                      alt={t("Airpimo 应用图标")}
+                      className="h-14 w-14 shrink-0 object-contain"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <h2 className="text-[17px] font-semibold leading-snug tracking-tight">Airpimo</h2>
+                      <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+                        v{brand.version}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                      {t('轻量、开源的 AirPlay 接收工具')}
+                    </p>
+                    <p className="text-[10px] leading-relaxed text-muted-foreground">
+                      {t('支持将 iPhone / iPad 屏幕投射到电脑')}
+                    </p>
+                  </div>
+                </header>
+
+                <div className="rounded-xl border border-border bg-card p-3.5 shadow-sm">
+                  <h3 className="text-xs font-semibold">{t("软件更新")}</h3>
+                  <p className="mt-1 text-[10px] leading-normal text-muted-foreground">
+                    {t("检查新版本并从 GitHub Release 获取安装包。")}
+                  </p>
+                  <div
+                      className={`mt-3 flex items-start gap-2 rounded-lg bg-muted/70 px-2.5 py-2.5 text-[11px] leading-[1.5] ${updateResult?.kind === "error" ? "text-destructive" : updateResult?.kind === "available" ? "text-foreground" : "text-muted-foreground"}`}
+                      role="status"
+                      aria-live="polite"
+                      aria-busy={updateChecking}
+                  >
+                    {updateResult?.kind === "error" ? (
+                        <AlertCircle size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
+                    ) : updateResult?.kind === "latest" ? (
+                        <CheckCircle2 size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
+                    ) : (
+                        <RefreshCw size={15} className={`mt-0.5 shrink-0 ${updateChecking ? "motion-safe:animate-spin" : ""}`} aria-hidden="true" />
+                    )}
+                    <span className="min-w-0 break-words">
+                      {updateChecking
+                          ? t("正在检查更新…")
+                          : !updateResult
+                              ? t("尚未检查更新")
+                              : updateResult.kind === "available"
+                                  ? `${t("发现新版本")} ${updateResult.latest}`
+                                  : updateResult.kind === "latest"
+                                      ? `${t("已是最新版本")} (v${updateResult.current})`
+                                      : t(updateResult.message)}
                     </span>
-                  </span>
-                  <ExternalLink size={14} className="shrink-0 text-muted-foreground" aria-hidden="true" />
-                </button>
-                <div className="flex items-center justify-between gap-3 px-px py-3 text-xs">
-                  <span className="font-semibold">{t('开源协议')}</span>
-                  <span className="text-muted-foreground">GPL-3.0-or-later</span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => void runUpdateCheck()}
+                        disabled={updateChecking}
+                    >
+                      <RefreshCw size={13} aria-hidden="true" className={`mr-1.5 ${updateChecking ? "motion-safe:animate-spin" : ""}`} />
+                      {updateChecking ? t("检查中…") : t("检查更新")}
+                    </Button>
+                    {updateResult?.kind === "available" && (
+                        <Button
+                            type="button"
+                            onClick={() => void openRelease()}
+                            disabled={releaseOpening}
+                        >
+                          <Download size={13} className="mr-1.5" aria-hidden="true" />
+                          {releaseOpening ? t("打开中…") : t("下载")}
+                        </Button>
+                    )}
+                  </div>
                 </div>
+
+                <div className="mt-3 rounded-xl border border-border bg-card px-3.5 shadow-sm">
+                  <h3 className="border-b border-border py-3 text-xs font-semibold">{t("项目信息")}</h3>
+                  <button
+                      type="button"
+                      onClick={onProject}
+                      className="flex w-full items-center justify-between gap-3 bg-transparent py-3 text-left transition-colors hover:text-primary focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                      aria-label={t("打开 GitHub 项目主页")}
+                  >
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <Github size={16} strokeWidth={1.8} className="shrink-0" aria-hidden="true" />
+                      <span className="min-w-0">
+                        <strong className="block text-xs font-semibold">GitHub</strong>
+                        <small className="mt-0.5 block break-all text-[10px] text-muted-foreground">github.com/rfw/Airpimo</small>
+                      </span>
+                    </span>
+                    <ExternalLink size={14} className="shrink-0 text-muted-foreground" aria-hidden="true" />
+                  </button>
+                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-border py-3 text-xs">
+                    <span className="font-medium">{t('开源协议')}</span>
+                    <span className="text-[11px] text-muted-foreground">GPL-3.0-or-later</span>
+                  </div>
+                </div>
+                <p className="mt-4 text-center text-[10px] text-muted-foreground">© Airpimo</p>
               </div>
-              <p className="mt-5 text-center text-[10px] text-muted-foreground">© Airpimo</p>
             </section>
 
             <section

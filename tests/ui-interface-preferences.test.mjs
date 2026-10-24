@@ -9,10 +9,10 @@ const bridge = read('src/lib/desktop.ts');
 const native = read('src-tauri/src/receiver.rs');
 const commands = read('src-tauri/src/lib.rs');
 
-test('Interface tab reuses the existing theme identifier and preserves the five-tab layout', () => {
-  assert.match(view, /SettingsTab = "config" \| "theme" \| "updates" \| "about" \| "diagnostics"/);
+test('Interface tab reuses the existing theme identifier and preserves the four-tab layout', () => {
+  assert.match(view, /SettingsTab = "config" \| "theme" \| "about" \| "diagnostics"/);
   assert.match(view, /\["theme", t\("界面"\)\]/);
-  assert.match(view, /grid-cols-5/);
+  assert.match(view, /grid-cols-4/);
   assert.match(view, /id="airpimo-panel-theme"[\s\S]*?hidden=\{settingsTab !== "theme"\}/);
   assert.match(view, /id="airpimo-interface-language-label"[\s\S]*?id="airpimo-appearance-theme-label"/);
   assert.match(view, /name="interfaceLanguage"[\s\S]*?checked=\{choice === value\}[\s\S]*?setChoice\(value\)/);

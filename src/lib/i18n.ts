@@ -50,6 +50,8 @@ const english: Record<string, string> = {
   '简体中文': '简体中文', '取消': 'Cancel', '保存设置': 'Save settings',
   '当前版本': 'Current version', '正在检查更新…': 'Checking for updates…', '尚未检查更新': 'Updates not checked yet',
   '检查中…': 'Checking…', '检查更新': 'Check for updates', '打开中…': 'Opening…', '下载': 'Download',
+  '软件更新': 'Software updates', '检查新版本并从 GitHub Release 获取安装包。': 'Check for a new version and get installers from GitHub Releases.',
+  '项目信息': 'Project information',
   '发现新版本': 'New version available', '已是最新版本': 'You are up to date',
   'Airpimo 应用图标': 'Airpimo app icon', '版本': 'Version',
   '轻量、开源的 AirPlay 接收工具': 'Lightweight open-source AirPlay receiver',

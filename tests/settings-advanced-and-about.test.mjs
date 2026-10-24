@@ -16,14 +16,16 @@ test('advanced toggle defaults closed, persists separately, and does not mutate 
   assert.doesNotMatch(view, /toggleAdvanced\([^)]*\)[\s\S]{0,90}setDraft/);
 });
 
-test('About is fifth-panel tab before diagnostics and preserves existing update/config behavior', () => {
+test('About merges software updates and project details in the four-tab layout', () => {
   const view = read('src/components/AirpimoSettingsDialog.tsx');
-  assert.match(view, /SettingsTab = "config" \| "theme" \| "updates" \| "about" \| "diagnostics"/);
-  assert.match(view, /grid-cols-5/);
-  assert.match(view, /\["updates", t\("升级"\)\][\s\S]*?\["about", t\("关于"\)\][\s\S]*?\["diagnostics", t\("诊断"\)\]/);
+  assert.match(view, /SettingsTab = "config" \| "theme" \| "about" \| "diagnostics"/);
+  assert.match(view, /grid-cols-4/);
+  assert.match(view, /\["about", t\("关于"\)\][\s\S]*?\["diagnostics", t\("诊断"\)\]/);
   assert.match(view, /id="airpimo-panel-about"[\s\S]*?hidden=\{settingsTab !== "about"\}/);
   assert.match(view, /src=\{airpimoIcon\}[\s\S]*?brand\.version[\s\S]*?iPhone \/ iPad/);
   assert.match(view, /github\.com\/rfw\/Airpimo/);
+  assert.match(view, /t\("软件更新"\)[\s\S]*?runUpdateCheck[\s\S]*?openRelease[\s\S]*?t\("项目信息"\)/);
+  assert.doesNotMatch(view, /airpimo-tab-updates|airpimo-panel-updates/);
   assert.match(view, /GPL-3\.0-or-later/);
   assert.match(view, /id="airpimo-panel-diagnostics"/);
 });

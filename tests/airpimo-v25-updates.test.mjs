@@ -46,7 +46,9 @@ test('startup update check is only requested once per app session',async()=>{
 });
 test('settings tabs, diagnostics, feedback expiry and tray defaults remain functional',()=>{
  const app=file('src/App.tsx'), view=file('src/components/AirpimoSettingsDialog.tsx'), home=file('src/components/AirpimoHome.tsx');
- for(const key of ['config','theme','updates','diagnostics'])assert.ok(view.includes(`airpimo-panel-${key}`));
+ for(const key of ['config','theme','about','diagnostics'])assert.ok(view.includes(`airpimo-panel-${key}`));
+ assert.doesNotMatch(view,/id="airpimo-panel-updates"/);
+ assert.match(view,/id="airpimo-panel-about"[\s\S]*?onClick=\{\(\) => void runUpdateCheck\(\)\}/);
  for(const behavior of ['checkAtStartup(brand.version)','checkForRelease(brand.version)','await desktop.exportDiagnostics()','await desktop.openReleasePage(updateResult.pageUrl)'])assert.ok(app.includes(behavior));
  assert.match(app,/setTimeout\(\(\) => setFeedback/);
  assert.match(app,/3200/);
