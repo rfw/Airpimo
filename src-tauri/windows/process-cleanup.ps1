@@ -17,7 +17,18 @@ foreach ($target in $targets) {
 }
 if (-not $hasInstalledExecutable) { exit 0 }
 function Get-ScopedProcesses {
-  $items = @(Get-WmiObject Win32_Process -Filter "Name='Airpimo.exe' OR Name='uxplay.exe'" -ErrorAction Stop)
+  # Win7 WMI can fail even after every Airpimo process has exited. Use the
+  # native process snapshot first and only invoke WMI when a candidate exists.
+  # We still require an exact executable-path match before terminating anything.
+  $candidates = @(Get-Process -ErrorAction Stop | Where-Object {
+    $_.ProcessName -ieq 'Airpimo' -or $_.ProcessName -ieq 'uxplay'
+  })
+  if ($candidates.Count -eq 0) { return }
+  try {
+    $items = @(Get-WmiObject Win32_Process -Filter "Name='Airpimo.exe' OR Name='uxplay.exe'" -ErrorAction Stop)
+  } catch {
+    throw "WMI query failed while candidate process names exist: $($_.Exception.Message)"
+  }
   foreach ($item in $items) {
     if ($null -eq $item.ExecutablePath) { continue }
     foreach ($target in $targets) {
@@ -40,12 +51,15 @@ try {
   foreach ($item in @(Get-ScopedProcesses)) {
     # Scoped to installation root; exit if access is denied instead of ignoring locks.
     $result = $item.Terminate()
-    if ($null -ne $result -and $result.ReturnValue -ne 0 -and $result.ReturnValue -ne 9) { exit 5 }
+    if ($null -ne $result -and $result.ReturnValue -ne 0 -and $result.ReturnValue -ne 9) {
+      throw "Terminate failed for PID $($item.ProcessId), WMI return code $($result.ReturnValue)"
+    }
   }
   for ($attempt = 0; $attempt -lt 20; $attempt++) {
     if (@(Get-ScopedProcesses).Count -eq 0) { exit 0 }
     Start-Sleep -Milliseconds 250
   }
+  throw "Timed out waiting for scoped Airpimo/UxPlay processes to exit"
 } catch {
   # Distinguish a WMI/script failure from an actual process still running.
   try {

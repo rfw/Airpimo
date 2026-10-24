@@ -69,6 +69,13 @@ test('PowerShell payload matches versioned script and kills only installed path-
   assert.match(source,/AIRPIMO_INSTALL_DIR/);
   assert.match(source,/\[string\]::Equals\(\$item\.ExecutablePath, \$target, \[StringComparison\]::OrdinalIgnoreCase\)/);
   assert.match(source,/Get-WmiObject Win32_Process/);
+  assert.match(source,/Get-Process -ErrorAction Stop \| Where-Object/);
+  assert.match(source,/\$_.ProcessName -ieq 'Airpimo'/);
+  assert.match(source,/if \(\$candidates.Count -eq 0\) \{ return \}/);
+  assert.ok(source.indexOf('if ($candidates.Count -eq 0) { return }') < source.indexOf('Get-WmiObject Win32_Process'));
+  assert.match(source,/throw \"WMI query failed/);
+  assert.match(source,/Timed out waiting for scoped Airpimo/);
+
   assert.match(source,/sidecar\\uxplay\.exe/);
   assert.doesNotMatch(source,/taskkill|Stop-Process|Win32_Process -Filter "Name='uxplay.exe'"/);
   assert.match(hooks,/!macro NSIS_HOOK_PREINSTALL/);
