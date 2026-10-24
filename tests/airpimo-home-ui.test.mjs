@@ -23,7 +23,7 @@ test("device identity and clipboard semantics are preserved", () => {
   assert.match(home, /snapshot\.applied_device_name/);
   assert.match(home, /@Airpimo\$\//);
   assert.match(home, /onCopy\(name\)/);
-  assert.match(home, /aria-label="复制投屏设备名称"/);
+  assert.match(home, /aria-label=\{t\(["']复制投屏设备名称["']\)\}/);
 });
 
 test("footer remains a single source of receiver feedback and settings entry", () => {
@@ -33,7 +33,7 @@ test("footer remains a single source of receiver feedback and settings entry", (
   assert.match(home, /aria-live=/);
   assert.match(home, /statusLabel/);
   assert.match(home, /onClearFeedback/);
-  assert.match(home, /aria-label="打开设置"/);
+  assert.match(home, /aria-label=\{t\(["']打开设置["']\)\}/);
   assert.match(home, /brand.version/);
   assert.match(status, /discovery_verified/);
   assert.match(app, /<AirpimoSettingsDialog/);

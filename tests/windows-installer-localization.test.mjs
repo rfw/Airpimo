@@ -10,8 +10,11 @@ const win7=JSON.parse(read('src-tauri/tauri.win7.conf.json'));
 
 // Both packaging entry points inherit shared languages from tauri.conf.json.
 // The Win7 override must not repeat these fields or change platform runtimes.
-test('Win7 inherits shared Chinese/English NSIS settings while preserving separate runtimes',()=>{
-  assert.deepEqual(base.bundle.windows.nsis.languages,['English','SimpChinese']);
+test('Win7 inherits shared nine-language NSIS settings while preserving separate runtimes',()=>{
+  assert.deepEqual(base.bundle.windows.nsis.languages,[
+    'English','SimpChinese','TradChinese','Japanese','Korean',
+    'French','German','Spanish','Russian',
+  ]);
   assert.equal(base.bundle.windows.nsis.displayLanguageSelector,false);
   assert.equal(Object.hasOwn(win7.bundle.windows.nsis,'languages'),false);
   assert.equal(Object.hasOwn(win7.bundle.windows.nsis,'displayLanguageSelector'),false);

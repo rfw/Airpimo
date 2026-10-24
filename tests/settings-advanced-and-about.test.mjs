@@ -20,7 +20,7 @@ test('About is fifth-panel tab before diagnostics and preserves existing update/
   const view = read('src/components/AirpimoSettingsDialog.tsx');
   assert.match(view, /SettingsTab = "config" \| "theme" \| "updates" \| "about" \| "diagnostics"/);
   assert.match(view, /grid-cols-5/);
-  assert.match(view, /\["updates", "升级"\][\s\S]*?\["about", "关于"\][\s\S]*?\["diagnostics", "诊断"\]/);
+  assert.match(view, /\["updates", t\("升级"\)\][\s\S]*?\["about", t\("关于"\)\][\s\S]*?\["diagnostics", t\("诊断"\)\]/);
   assert.match(view, /id="airpimo-panel-about"[\s\S]*?hidden=\{settingsTab !== "about"\}/);
   assert.match(view, /src=\{airpimoIcon\}[\s\S]*?brand\.version[\s\S]*?iPhone \/ iPad/);
   assert.match(view, /github\.com\/rfw\/Airpimo/);

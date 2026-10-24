@@ -1,3 +1,4 @@
+import { translate, type Language } from "../lib/i18n";
 import { formatDuration, type Issue, type Snapshot } from "./state";
 
 export type HomeTone = "success" | "neutral" | "warning" | "error";
@@ -24,7 +25,7 @@ const errorLabels: Record<Exclude<Issue, null>, string> = {
  * phone can discover it, and a mirror connection does not verify audio.
  * Detailed backend errors remain accessible through the footer tooltip.
  */
-export function homeStatus(
+function baseHomeStatus(
   snapshot: Snapshot,
   ready: boolean,
   bootError: string,
@@ -115,4 +116,20 @@ export function homeStatus(
     label: "接收已停止",
     details: "点击「开始接收」，再从手机的「屏幕镜像」选择设备",
   };
+}
+
+/** Localize the semantic receiver state without changing backend state or tests. */
+export function homeStatus(snapshot: Snapshot, ready: boolean, bootError: string, now: number, language: Language = 'zh-CN'): HomeStatus {
+  const state = baseHomeStatus(snapshot, ready, bootError, now);
+  if (language === 'zh-CN') return state;
+  const translateStatus = (text: string) => {
+    const connected = /^(正在投屏) · (\d\d:\d\d:\d\d)$/.exec(text);
+    if (connected) return `${translate(connected[1], language)} · ${connected[2]}`;
+    if (text.startsWith('上次连接未完成，可重新发起投屏。'))
+      return translate('上次连接未完成，可重新发起投屏。', language) + translate(text.slice('上次连接未完成，可重新发起投屏。'.length), language);
+    if (text.startsWith('上次投屏已断开。'))
+      return translate('上次投屏已断开。', language) + translate(text.slice('上次投屏已断开。'.length), language);
+    return translate(text, language);
+  };
+  return { ...state, label: translateStatus(state.label), details: translateStatus(state.details) };
 }

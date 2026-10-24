@@ -5,6 +5,8 @@ import {
   Settings,
   Square,
 } from "lucide-react";
+import { useI18n } from "../lib/i18n-react";
+import { translate } from "../lib/i18n";
 import { brand } from "../brand";
 import { type Snapshot, showRestartPrompt, issueHint } from "../domain/state";
 import { homeStatus } from "../domain/home-status";
@@ -49,26 +51,27 @@ export function AirpimoHome({
   onClearFeedback,
   updateAvailable,
 }: AirpimoHomeProps) {
+  const { t, language } = useI18n();
   const macOS = isMacOS();
   const active = snapshot.process_running;
   const baseName = active
     ? snapshot.applied_device_name ?? snapshot.settings.device_name
     : snapshot.settings.device_name;
   const name = `${baseName.replace(/@Airpimo$/, "")}@Airpimo`;
-  const status = homeStatus(snapshot, ready, bootError, now);
+  const status = homeStatus(snapshot, ready, bootError, now, language);
   const starting = snapshot.stage === "starting";
   const retry = snapshot.stage === "error" && !active;
   const disabled = !ready || busy || starting || !isDesktop();
-  const label = active ? "停止接收" : "开始接收";
+  const label = active ? t("停止接收") : t("开始接收");
   const onPrimaryAction = active ? onStop : retry ? onRetry : onStart;
   const serviceError = Boolean(bootError) || snapshot.stage === "error";
   const restartNeeded = showRestartPrompt(snapshot);
-  const feedbackIsError = feedback !== "" && feedback !== "复制成功";
+  const feedbackIsError = feedback !== "" && feedback !== "复制成功" && feedback !== "诊断日志已导出";
   // All transient successes, failures, pending-restart and receiver states live in the footer.
   // Service failures take precedence over a stale "copied" notification.
   const statusLabel = serviceError
     ? status.label
-    : feedback || (restartNeeded ? "设置已修改 · 点击重启生效" : status.label);
+    : translate(feedback, language) || (restartNeeded ? t("设置已修改 · 点击重启生效") : status.label);
   const statusTone = serviceError
     ? status.tone
     : feedback
@@ -80,7 +83,7 @@ export function AirpimoHome({
         : status.tone;
   const diagnosticHint =
     snapshot.stage === "error"
-      ? issueHint(snapshot.issue, import.meta.env.DEV)
+      ? t(issueHint(snapshot.issue, import.meta.env.DEV))
       : "";
   const fullStatus = [statusLabel, status.details, diagnosticHint]
     .filter(Boolean)
@@ -112,8 +115,8 @@ export function AirpimoHome({
           <AirpimoSignal size={220} animated={active} />
 
           <div className="flex flex-col items-center gap-0">
-            <section className="flex w-[min(100%,370px)] min-w-0 flex-col items-center text-center" aria-label="投屏设备名称">
-              <span className="text-xs font-[450] text-muted-foreground">投屏设备名称</span>
+            <section className="flex w-[min(100%,370px)] min-w-0 flex-col items-center text-center" aria-label={t("投屏设备名称")}>
+              <span className="text-xs font-[450] text-muted-foreground">{t('投屏设备名称')}</span>
               <div className="mt-1 flex max-w-full min-w-0 items-center justify-center gap-1.5 pl-7">
                 <strong className="min-w-0 max-w-[min(270px,calc(100vw-120px))] truncate text-[20px] font-[660] leading-[1.3] tracking-[-0.35px]" title={name}>
                   {name}
@@ -121,8 +124,8 @@ export function AirpimoHome({
                 <button
                   className="grid size-7 shrink-0 place-items-center rounded-[7px] border-0 bg-transparent p-0 text-muted-foreground hover:bg-muted hover:text-foreground"
                   type="button"
-                  aria-label="复制投屏设备名称"
-                  title="复制设备名称"
+                  aria-label={t("复制投屏设备名称")}
+                  title={t("复制设备名称")}
                   onClick={() => onCopy(name)}
                 >
                   <ClipboardCopy size={16} strokeWidth={1.9} />
@@ -183,7 +186,7 @@ export function AirpimoHome({
               type="button"
               className="min-w-0 truncate cursor-pointer border-0 bg-transparent py-[3px] text-left font-[inherit] text-inherit hover:underline focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#1677fb]"
               onClick={onClearFeedback}
-              title={`${fullStatus} · 点击关闭消息`}
+              title={`${fullStatus} · ${t("点击关闭消息")}`}
             >
               {statusLabel}
             </button>
@@ -197,14 +200,14 @@ export function AirpimoHome({
           <button
             type="button"
             className="relative grid h-7 w-[26px] place-items-center rounded-[7px] border-0 bg-transparent p-0 text-muted-foreground hover:enabled:bg-muted hover:enabled:text-foreground disabled:opacity-45"
-            aria-label="打开设置"
-            title={updateAvailable ? "设置 · 发现新版本" : "设置"}
+            aria-label={t("打开设置")}
+            title={updateAvailable ? t("设置 · 发现新版本") : t("设置")}
             disabled={!ready || !isDesktop()}
             onClick={onSettings}
           >
             <Settings size={16} strokeWidth={1.8} />
             {updateAvailable && (
-              <span className="absolute right-px top-px size-1.5 rounded-full bg-[#3986ee]" aria-label="发现新版本" />
+              <span className="absolute right-px top-px size-1.5 rounded-full bg-[#3986ee]" aria-label={t("发现新版本")} />
             )}
           </button>
         </div>

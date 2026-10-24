@@ -8,11 +8,11 @@ test('GitHub entry moves from home footer to About tab, before diagnostics', () 
   const home = read('src/components/AirpimoHome.tsx');
   const dialog = read('src/components/AirpimoSettingsDialog.tsx');
   const app = read('src/App.tsx');
-  assert.doesNotMatch(home, /Github|onProject|aria-label="打开 GitHub 项目主页"/);
-  assert.match(home, /aria-label="打开设置"/);
+  assert.doesNotMatch(home, /Github|onProject|aria-label=\{t\(["']打开 GitHub 项目主页["']\)\}/);
+  assert.match(home, /aria-label=\{t\(["']打开设置["']\)\}/);
   assert.match(dialog, /import\s*\{[^}]*Github[^}]*\}\s*from\s*"lucide-react"/);
-  assert.match(dialog, /\["about", "关于"\][\s\S]*?\["diagnostics", "诊断"\]/);
-  assert.match(dialog, /id="airpimo-panel-about"[\s\S]*?onClick=\{onProject\}[\s\S]*?aria-label="打开 GitHub 项目主页"/);
+  assert.match(dialog, /\["about", t\("关于"\)\][\s\S]*?\["diagnostics", t\("诊断"\)\]/);
+  assert.match(dialog, /id="airpimo-panel-about"[\s\S]*?onClick=\{onProject\}[\s\S]*?aria-label=\{t\(["']打开 GitHub 项目主页["']\)\}/);
   assert.match(app, /<AirpimoSettingsDialog[\s\S]*?onProject=\{\(\) => void openProject\(\)\}/);
 });
 

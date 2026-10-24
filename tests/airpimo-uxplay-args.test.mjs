@@ -42,8 +42,8 @@ test('settings retain advanced option warning and existing controls',()=>{
  assert.match(view,/id="uxplayArgs"/);
  assert.match(view,/非专业人员请勿修改/);
  assert.match(view,/重启接收服务才会生效/);
- assert.match(view,/aria-label="最大请求帧率"/);
- assert.match(view,/aria-label="画面亮度"/);
+ assert.match(view,/aria-label=\{t\(["']最大请求帧率["']\)\}/);
+ assert.match(view,/aria-label=\{t\(["']画面亮度["']\)\}/);
 });
 
 test('native receiver retains advanced parameter support and UI ownership',()=>{

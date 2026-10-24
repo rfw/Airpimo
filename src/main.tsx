@@ -1,6 +1,7 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import { LanguageProvider } from "./lib/i18n-react";
 import { disableContextMenu } from "./lib/context-menu";
 import "./styles.css";
 
@@ -9,6 +10,6 @@ disableContextMenu(document);
 
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App />
+    <LanguageProvider><App /></LanguageProvider>
   </React.StrictMode>,
 );

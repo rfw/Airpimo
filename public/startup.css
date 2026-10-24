@@ -12,3 +12,6 @@ html.dark #airpimo-startup { background: #1b1e23; color: #aeb8c6; }
 html.dark #airpimo-startup strong { color: #d9dee6; }
 @keyframes airpimo-wheel { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { #airpimo-startup .airpimo-loading-wheel { animation: none; } }
+
+html[lang="en"] .airpimo-startup-zh { display: none; }
+html[lang="zh-CN"] .airpimo-startup-en { display: none; }

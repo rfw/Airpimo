@@ -1,4 +1,5 @@
 
+import { useI18n } from "../lib/i18n-react";
 import { MonitorSmartphone } from "lucide-react";
 
 interface AirpimoSignalProps {
@@ -21,10 +22,11 @@ export function AirpimoSignal({
   size = 182,
   animated = true,
 }: AirpimoSignalProps) {
+  const { t } = useI18n();
   return (
     <div
       role="img"
-      aria-label="Airpimo 投屏接收"
+      aria-label={t("Airpimo 投屏接收")}
       className={`
         relative isolate shrink-0
         overflow-hidden rounded-full

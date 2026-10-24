@@ -1,4 +1,5 @@
 
+import { useI18n } from "../lib/i18n-react";
 import { Smartphone, ScreenShare, Monitor, ChevronRight } from "lucide-react";
 
 interface ScreenMirroringGuide {
@@ -8,6 +9,7 @@ interface ScreenMirroringGuide {
 export function ScreenMirroringGuide({
                                                  deviceName = "",
                                              }: ScreenMirroringGuide) {
+    const { t } = useI18n();
     const iconClass = "h-[16px] w-[16px] text-blue-600 dark:text-blue-700";
 
     const iconWrapperClass =
@@ -21,8 +23,8 @@ export function ScreenMirroringGuide({
                     <div className={iconWrapperClass}>
                         <Smartphone className={iconClass} strokeWidth={1.8} />
                     </div>
-                    <span className="whitespace-nowrap text-[11px] text-slate-600 dark:text-slate-500">
-            iPhone 控制中心
+                    <span className="flex min-h-7 items-center justify-center text-center text-[11px] leading-[1.2] text-slate-600 dark:text-slate-500">
+            {t('iPhone 控制中心')}
           </span>
                 </div>
 
@@ -36,8 +38,8 @@ export function ScreenMirroringGuide({
                     <div className={iconWrapperClass}>
                         <ScreenShare className={iconClass} strokeWidth={1.8} />
                     </div>
-                    <span className="whitespace-nowrap text-[11px] text-slate-600 dark:text-slate-500">
-            屏幕镜像
+                    <span className="flex min-h-7 items-center justify-center text-center text-[11px] leading-[1.2] text-slate-600 dark:text-slate-500">
+            {t('屏幕镜像')}
           </span>
                 </div>
 

@@ -107,7 +107,7 @@ test('brightness is backed by real UxPlay -vc videobalance and retains Windows A
   assert.match(app,/<AirpimoSettingsDialog\b/);
   assert.match(app,/draft=\{draft\}/);
   assert.match(app,/setDraft=\{setDraft\}/);
-  assert.match(settingsDialog,/aria-label="画面亮度"\s+type="range"/);
+  assert.match(settingsDialog,/aria-label=\{t\(["']画面亮度["']\)\}\s+type="range"/);
   assert.match(settingsDialog,/min=\{0\}\s+max=\{100\}\s+step=\{5\}\s+value=\{draft\.brightness\}/);
   assert.match(settingsDialog,/brightness: Number\(e\.target\.value\)/);
   assert.doesNotMatch(receiver,/"-vsync", "no"\]\);\s*\/\/.*windows/);

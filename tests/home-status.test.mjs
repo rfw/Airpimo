@@ -7,6 +7,9 @@ import { registerHooks } from "node:module";
 // production module paths or compiler options.
 registerHooks({
   resolve(specifier, context, nextResolve) {
+    if (specifier === "../lib/i18n" && context.parentURL?.endsWith("/home-status.ts")) {
+      return nextResolve("../lib/i18n.ts", context);
+    }
     if (specifier === "./state" && context.parentURL?.endsWith("/home-status.ts")) {
       return nextResolve("./state.ts", context);
     }
