@@ -44,29 +44,55 @@ try {
   # Do not call CloseMainWindow here: with "stay in tray" enabled it only
   # hides Airpimo, wasting time before termination. WMI objects below were
   # already verified against this exact installation path.
+  $terminationFailures = @()
   foreach ($item in $running) {
-    $result = $item.Terminate()
-    if ($null -ne $result -and $result.ReturnValue -ne 0 -and $result.ReturnValue -ne 9) {
-      throw "Terminate failed for PID $($item.ProcessId), WMI return code $($result.ReturnValue)"
+    try {
+      $result = $item.Terminate()
+      if ($null -ne $result -and $result.ReturnValue -ne 0 -and $result.ReturnValue -ne 9) {
+        $terminationFailures += "PID $($item.ProcessId) WMI=$($result.ReturnValue)"
+      }
+    } catch {
+      $terminationFailures += "PID $($item.ProcessId) exception=$($_.Exception.Message)"
     }
   }
-  # Wait on the already identified PIDs using native process handles instead
-  # of repeating a costly Win7 WMI query twenty times. Recheck exact paths once
-  # before allowing the old installer's files to be removed.
-  foreach ($item in $running) {
-    $process = Get-Process -Id ([int]$item.ProcessId) -ErrorAction SilentlyContinue
-    if ($null -ne $process) {
-      try { $null = $process.WaitForExit(2000) } catch { }
+  # A termination result can race with an independently exiting process.
+  # Never fail just on a stale result; fail if and only if verification still
+  # finds a process under this exact installation path after bounded waiting.
+  # Terminate() can return before Win7 has completed all process shutdown.
+  # The earlier single 2-second wait occasionally rejected an already-exiting
+  # process, forcing the user to click Next a second time. Confirm termination
+  # within a bounded window instead of treating one early snapshot as final.
+  $deadline = [DateTime]::UtcNow.AddSeconds(12)
+  while ($true) {
+    $remaining = @(Get-ScopedProcesses)
+    if ($remaining.Count -eq 0) { exit 0 }
+    if ([DateTime]::UtcNow -ge $deadline) { break }
+    # Wait on the verified PIDs only. We do not terminate by process name.
+    # A process that disappears between WMI and Get-Process is not a failure.
+    foreach ($item in $remaining) {
+      $milliseconds = [int][Math]::Min(1000, [Math]::Max(1, ($deadline - [DateTime]::UtcNow).TotalMilliseconds))
+      if ($milliseconds -le 0) { break }
+      $process = Get-Process -Id ([int]$item.ProcessId) -ErrorAction SilentlyContinue
+      if ($null -ne $process) {
+        try { $null = $process.WaitForExit($milliseconds) } catch { } finally { $process.Close() }
+      }
     }
+    if ([DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 250 }
   }
-  if (@(Get-ScopedProcesses).Count -eq 0) { exit 0 }
-  throw "Timed out waiting for scoped Airpimo/UxPlay processes to exit"
+  # Final path-scoped verification is mandatory: never uninstall while a
+  # process belonging to this exact installation is still running.
+  $remaining = @(Get-ScopedProcesses)
+  if ($remaining.Count -eq 0) { exit 0 }
+  $details = (@($remaining | ForEach-Object { "$($_.Name) pid=$($_.ProcessId)" }) -join ', ')
+  $failures = ($terminationFailures -join '; ')
+  throw "Timed out waiting for scoped Airpimo/UxPlay processes to exit: $details; terminate=$failures"
 } catch {
   # Distinguish a WMI/script failure from an actual process still running.
   try {
     $log = [IO.Path]::Combine([IO.Path]::GetTempPath(), 'Airpimo-installer-cleanup.log')
     [IO.File]::AppendAllText($log, "$(Get-Date -Format s) root=$root error=$($_.Exception.Message)`r`n")
   } catch { }
+  Write-Output "AIRPIMO_CLEANUP_ERROR: $($_.Exception.Message)"
   exit 5
 }
 exit 5

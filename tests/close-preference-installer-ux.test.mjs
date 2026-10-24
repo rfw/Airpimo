@@ -79,8 +79,9 @@ test('Win7 path-matched cleanup avoids tray-only CloseMainWindow and repeating W
   const script = read('src-tauri/windows/process-cleanup.ps1');
   assert.match(script, /\[string\]::Equals\(\$item\.ExecutablePath, \$target, \[StringComparison\]::OrdinalIgnoreCase\)/);
   assert.match(script, /\$result = \$item\.Terminate\(\)/);
-  assert.match(script, /\$process\.WaitForExit\(2000\)/);
-  assert.match(script, /if \(@\(Get-ScopedProcesses\)\.Count -eq 0\) \{ exit 0 \}/);
+  assert.match(script, /\$process\.WaitForExit\(\$milliseconds\)/);
+  assert.match(script, /\$remaining = @\(Get-ScopedProcesses\)/);
+  assert.match(script, /if \(\$remaining\.Count -eq 0\) \{ exit 0 \}/);
   assert.doesNotMatch(script, /\$appProcess\.CloseMainWindow\(\)/);
   assert.doesNotMatch(script, /for \(\$attempt = 0; \$attempt -lt 20/);
   assert.doesNotMatch(script, /taskkill|Stop-Process -Force/);
