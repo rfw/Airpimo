@@ -11,6 +11,7 @@ export const desktop = {
   async retry(): Promise<Snapshot> { requireDesktop(); return invoke('retry_receiving'); },
   async save(settings: Settings): Promise<Snapshot> { requireDesktop(); return invoke('save_settings', { settings }); },
   async setTheme(theme: ThemeChoice): Promise<Snapshot> { requireDesktop(); return invoke('set_theme', { theme }); },
+  async setStayInTray(stayInTray: boolean): Promise<Snapshot> { requireDesktop(); return invoke('set_stay_in_tray', { stayInTray }); },
   async diagnostics(): Promise<string> { requireDesktop(); return invoke('get_diagnostics'); },
   async exportDiagnostics(): Promise<string> { requireDesktop(); return invoke('export_diagnostics'); },
   async openProjectPage(): Promise<void> { requireDesktop(); return invoke('open_project_page'); },

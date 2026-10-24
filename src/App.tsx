@@ -42,11 +42,23 @@ function App() {
   const [themeSaving, setThemeSaving] = useState(false);
   const [themeError, setThemeError] = useState('');
   const themeSaveInFlight = useRef(false);
+  const [traySaving, setTraySaving] = useState(false);
+  const [trayError, setTrayError] = useState('');
+  const traySaveInFlight = useRef(false);
+  const pendingTray = useRef<boolean | null>(null);
   // Hide stale native snapshots while an appearance write is pending.
   const pendingTheme = useRef<ThemeChoice | null>(null);
   const applyNativeSnapshot = useCallback((value: Snapshot) => {
-    const selected = pendingTheme.current;
-    setSnapshot(selected === null ? value : { ...value, settings: { ...value.settings, theme: selected } });
+    // A receiver://snapshot may race either isolated preference write.
+    const selectedTheme = pendingTheme.current;
+    const selectedTray = pendingTray.current;
+    setSnapshot(selectedTheme === null && selectedTray === null ? value : {
+      ...value, settings: {
+        ...value.settings,
+        ...(selectedTheme === null ? {} : { theme: selectedTheme }),
+        ...(selectedTray === null ? {} : { stay_in_tray: selectedTray }),
+      },
+    });
   }, []);
 
   // Keep the static boot screen until backend snapshot/error initialization completes.
@@ -124,7 +136,7 @@ function App() {
   }, []);
 
   function openSettings(tab: SettingsTab = 'config') {
-    setDraft({ ...snapshot.settings }); setFormError(''); setThemeError(''); setSettingsTab(tab); setSettingsOpen(true);
+    setDraft({ ...snapshot.settings }); setFormError(''); setThemeError(''); setTrayError(''); setSettingsTab(tab); setSettingsOpen(true);
     if (tab === 'diagnostics') void loadDiagnostics();
   }
   function chooseTab(tab: SettingsTab) {
@@ -159,7 +171,7 @@ function App() {
     finally { setReleaseOpening(false); }
   }
   async function chooseTheme(value: ThemeChoice) {
-    if (!ready || actionBusy || themeSaveInFlight.current || value === snapshot.settings.theme) return;
+    if (!ready || actionBusy || themeSaveInFlight.current || traySaveInFlight.current || value === snapshot.settings.theme) return;
     const previous = snapshot.settings.theme;
     themeSaveInFlight.current = true;
     pendingTheme.current = value;
@@ -186,9 +198,39 @@ function App() {
     }
   }
 
+  async function chooseTrayPreference(value: boolean) {
+    if (!ready || actionBusy || themeSaveInFlight.current || traySaveInFlight.current || value === snapshot.settings.stay_in_tray) return;
+    const previous = snapshot.settings.stay_in_tray;
+    traySaveInFlight.current = true;
+    pendingTray.current = value;
+    setTraySaving(true);
+    setTrayError('');
+    // Update the switch immediately, then commit the one persisted native field.
+    setSnapshot(current => ({ ...current, settings: { ...current.settings, stay_in_tray: value } }));
+    setDraft(current => ({ ...current, stay_in_tray: value }));
+    try {
+      if (isDesktop()) {
+        const updated = await desktop.setStayInTray(value);
+        pendingTray.current = null;
+        setSnapshot(updated);
+        setDraft(current => ({ ...current, stay_in_tray: updated.settings.stay_in_tray }));
+      } else {
+        pendingTray.current = null;
+      }
+    } catch (error) {
+      pendingTray.current = null;
+      setSnapshot(current => ({ ...current, settings: { ...current.settings, stay_in_tray: previous } }));
+      setDraft(current => ({ ...current, stay_in_tray: previous }));
+      setTrayError(`保存托盘设置失败：${String(error)}`);
+    } finally {
+      traySaveInFlight.current = false;
+      setTraySaving(false);
+    }
+  }
+
   async function saveSettings() {
-    // A receiver configuration save must not overwrite a pending theme write.
-    if (themeSaveInFlight.current) return;
+    // A receiver configuration save must not overwrite a pending preference write.
+    if (themeSaveInFlight.current || traySaveInFlight.current) return;
     const problem = validateDeviceName(draft.device_name);
     if (problem) { setFormError(problem); return; }
     const fpsError = validateFps(draft.fps);
@@ -198,7 +240,7 @@ function App() {
     const argsError = validateUxplayArgs(draft.uxplay_args);
     if (argsError) { setFormError(argsError); return; }
     setFormError(''); setActionBusy(true);
-    try { setSnapshot(await desktop.save({ ...draft, theme: snapshot.settings.theme, device_name: draft.device_name.trim() })); setSettingsOpen(false); }
+    try { setSnapshot(await desktop.save({ ...draft, theme: snapshot.settings.theme, stay_in_tray: snapshot.settings.stay_in_tray, device_name: draft.device_name.trim() })); setSettingsOpen(false); }
     catch (error) { setFormError(String(error)); }
     finally { setActionBusy(false); }
   }
@@ -256,10 +298,13 @@ function App() {
       setDraft={setDraft}
       saveSettings={saveSettings}
       formError={translate(formError, language)}
-      actionBusy={actionBusy || themeSaving}
+      actionBusy={actionBusy || themeSaving || traySaving}
+      traySaving={traySaving}
+      trayError={trayError}
+      onTrayPreferenceChange={(value) => void chooseTrayPreference(value)}
       theme={snapshot.settings.theme}
       themeSaving={themeSaving}
-      themeDisabled={themeSaving || actionBusy || !ready}
+      themeDisabled={themeSaving || traySaving || actionBusy || !ready}
       themeError={themeError}
       onThemeChange={(value) => void chooseTheme(value)}
       updateResult={updateResult}

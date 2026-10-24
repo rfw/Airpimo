@@ -8,8 +8,12 @@
   ${OrIf} ${FileExists} "$INSTDIR\sidecar\uxplay.exe"
   ${OrIf} ${FileExists} "$INSTDIR\resources\sidecar\uxplay.exe"
     InitPluginsDir
+    ; PowerShell v2 can fail in nsExec when STDIN is redirected. The NSIS
+    ; documentation also warns against launching a .ps1 directly from the
+    ; PLUGINSDIR root. Use a child directory plus -InputFormat None.
+    CreateDirectory "$PLUGINSDIR\AirpimoCleanup"
     ClearErrors
-    FileOpen $R9 "$PLUGINSDIR\airpimo-cleanup.ps1" w
+    FileOpen $R9 "$PLUGINSDIR\AirpimoCleanup\airpimo-cleanup.ps1" w
     ${If} ${Errors}
       MessageBox MB_ICONSTOP|MB_OK "$(airpimoCleanupCreateError)"
       Abort
@@ -97,10 +101,13 @@
       MessageBox MB_ICONSTOP|MB_OK "$(airpimoCleanupLocationError)"
       Abort
     ${EndIf}
-    nsExec::ExecToStack '"$WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\airpimo-cleanup.ps1"'
+    ; The two trailing spaces follow the documented NSIS/PowerShell v2
+    ; stdin-redirection compatibility workaround, including on Windows 7.
+    nsExec::ExecToStack '"$WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe" -InputFormat None -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\AirpimoCleanup\airpimo-cleanup.ps1"  '
     Pop $0
     Pop $1
-    Delete "$PLUGINSDIR\airpimo-cleanup.ps1"
+    Delete "$PLUGINSDIR\AirpimoCleanup\airpimo-cleanup.ps1"
+    RMDir "$PLUGINSDIR\AirpimoCleanup"
     ${If} $0 != "0"
       DetailPrint "Airpimo scoped cleanup failed: exit=$0; output=$1"
       MessageBox MB_ICONSTOP|MB_OK "$(airpimoCleanupProcessError)"

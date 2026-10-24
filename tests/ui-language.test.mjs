@@ -98,7 +98,7 @@ test('language selector lives in the Interface panel and never saves to receiver
   assert.match(context, /localStorage\.setItem\(LANGUAGE_STORAGE_KEY, value\)/);
   assert.match(context, /window\.addEventListener\('languagechange', sync\)/);
   assert.doesNotMatch(context, /desktop\.save|invoke\(|restart\(/);
-  assert.match(app, /desktop\.save\(\{ \.\.\.draft, theme: snapshot\.settings\.theme, device_name:/);
+  assert.match(app, /desktop\.save\(\{ \.\.\.draft, theme: snapshot\.settings\.theme, stay_in_tray: snapshot\.settings\.stay_in_tray, device_name:/);
   assert.doesNotMatch(read('src/domain/state.ts'), /language:/);
 });
 

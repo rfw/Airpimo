@@ -45,13 +45,13 @@ test('Theme updates only the stored appearance field, using its own native IPC c
 });
 
 test('Theme click is optimistic, prevents concurrent writes, and rolls back on errors', () => {
-  assert.match(app, /themeSaveInFlight\.current \|\| value === snapshot\.settings\.theme/);
+  assert.match(app, /themeSaveInFlight\.current \|\| traySaveInFlight\.current \|\| value === snapshot\.settings\.theme/);
   assert.match(app, /pendingTheme\.current = value;[\s\S]*?setSnapshot\(current => \(\{ \.\.\.current, settings: \{ \.\.\.current\.settings, theme: value \} \}\)\);/);
   assert.match(app, /await desktop\.setTheme\(value\)/);
   assert.match(app, /catch \(error\) \{[\s\S]*?theme: previous[\s\S]*?setThemeError\(/);
-  assert.match(app, /if \(themeSaveInFlight\.current\) return;[\s\S]*?desktop\.save\(\{ \.\.\.draft, theme: snapshot\.settings\.theme/);
-  assert.match(app, /themeDisabled=\{themeSaving \|\| actionBusy \|\| !ready\}/);
-  assert.doesNotMatch(app.match(/async function chooseTheme\([\s\S]*?\n  async function saveSettings/)[0], /desktop\.(start|stop|retry|save)\(/);
+  assert.match(app, /if \(themeSaveInFlight\.current \|\| traySaveInFlight\.current\) return;[\s\S]*?desktop\.save\(\{ \.\.\.draft, theme: snapshot\.settings\.theme, stay_in_tray: snapshot\.settings\.stay_in_tray/);
+  assert.match(app, /themeDisabled=\{themeSaving \|\| traySaving \|\| actionBusy \|\| !ready\}/);
+  assert.doesNotMatch(app.match(/async function chooseTheme\([\s\S]*?\n  async function chooseTrayPreference/)[0], /desktop\.(start|stop|retry|save)\(/);
 });
 
 test('Interface tab and new appearance messages have English translations', async () => {

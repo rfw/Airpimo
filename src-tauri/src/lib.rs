@@ -23,6 +23,19 @@ fn get_settings(app: AppHandle) -> Settings { controller(&app).settings() }
 #[tauri::command]
 fn set_theme(app: AppHandle, theme: Theme) -> Result<Snapshot,String> { controller(&app).set_theme(&app,theme) }
 #[tauri::command]
+fn set_stay_in_tray(app: AppHandle, stay_in_tray: bool) -> Result<Snapshot,String> {
+    controller(&app).set_stay_in_tray(&app, stay_in_tray)
+}
+
+// The main-window X uses persisted native settings, never an unsaved frontend draft.
+// Both macOS (where closing a window normally leaves the app running) and Windows
+// must explicitly take the same action for the same user preference.
+#[derive(Debug, PartialEq, Eq)]
+enum MainWindowCloseAction { HideToTray, Exit }
+fn main_window_close_action(stay_in_tray: bool) -> MainWindowCloseAction {
+    if stay_in_tray { MainWindowCloseAction::HideToTray } else { MainWindowCloseAction::Exit }
+}
+#[tauri::command]
 fn start_receiving(app: AppHandle) -> Snapshot { controller(&app).start(&app,true) }
 #[tauri::command]
 fn stop_receiving(app: AppHandle) -> Snapshot { controller(&app).stop(&app) }
@@ -179,15 +192,18 @@ pub fn run() {
             if should_start { core.start(app.handle(),true); }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_snapshot,open_project_page,get_settings,set_theme,start_receiving,stop_receiving,retry_receiving,save_settings,get_diagnostics,export_diagnostics,open_release_page])
+        .invoke_handler(tauri::generate_handler![get_snapshot,open_project_page,get_settings,set_theme,set_stay_in_tray,start_receiving,stop_receiving,retry_receiving,save_settings,get_diagnostics,export_diagnostics,open_release_page])
         .on_window_event(|window,event| {
+            if window.label() != "main" { return; }
             if let WindowEvent::CloseRequested {api,..}=event {
+                // Suppress Tauri's default window destruction on both platforms.
+                // The native policy decides whether the main window stays alive hidden
+                // or the whole app terminates (including its managed receiver job).
+                api.prevent_close();
                 let app=window.app_handle();
-                if controller(app).settings().stay_in_tray {
-                    api.prevent_close(); let _=window.hide();
-                } else {
-                    controller(app).stop(app);
-                    app.exit(0);
+                match main_window_close_action(controller(app).settings().stay_in_tray) {
+                    MainWindowCloseAction::HideToTray => { let _=window.hide(); },
+                    MainWindowCloseAction::Exit => { app.exit(0); },
                 }
             }
         })
@@ -196,4 +212,14 @@ pub fn run() {
         .run(|app,event| {
             if let RunEvent::Exit=event { controller(app).stop(app); }
         });
+}
+
+#[cfg(test)]
+mod close_policy_tests {
+    use super::*;
+    #[test]
+    fn close_button_respects_persisted_tray_setting_on_all_platforms() {
+        assert_eq!(main_window_close_action(true), MainWindowCloseAction::HideToTray);
+        assert_eq!(main_window_close_action(false), MainWindowCloseAction::Exit);
+    }
 }

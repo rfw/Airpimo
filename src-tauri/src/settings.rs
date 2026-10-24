@@ -9,6 +9,7 @@ pub enum Theme { System, Light, Dark }
 pub struct Settings {
     pub device_name: String,
     pub auto_start: bool,
+    #[serde(default = "default_stay_in_tray")]
     pub stay_in_tray: bool,
     pub theme: Theme,
     #[serde(default = "default_fps")]
@@ -18,6 +19,7 @@ pub struct Settings {
     #[serde(default)]
     pub uxplay_args: String,
 }
+pub const fn default_stay_in_tray() -> bool { true }
 pub const fn default_fps() -> u16 { 60 }
 // Relative picture-darkening control, not the physical screen backlight.
 // New installs default to unchanged video brightness (100%). Existing saved values remain unchanged.
@@ -99,6 +101,13 @@ mod tests {
         assert_eq!(settings.fps, 60);
         assert_eq!(settings.brightness, 100);
         assert_eq!(settings.uxplay_args, "");
+        // Pre-tray-preference settings and explicitly disabled installs both preserve intent.
+        let old = r#"{"device_name":"Old-AirPlay","auto_start":true,"theme":"system"}"#;
+        let missing: Settings = serde_json::from_str(old).unwrap();
+        assert!(missing.stay_in_tray);
+        let off = r#"{"device_name":"Old-AirPlay","auto_start":true,"stay_in_tray":false,"theme":"system"}"#;
+        let disabled: Settings = serde_json::from_str(off).unwrap();
+        assert!(!disabled.stay_in_tray);
     }
     #[test] fn picture_brightness_mapping_and_boundaries() {
         assert_eq!(default_brightness(), 100);

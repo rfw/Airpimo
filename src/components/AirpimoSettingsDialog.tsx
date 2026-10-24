@@ -23,6 +23,9 @@ interface SettingsDialogProps {
   saveSettings(): Promise<void>;
   formError: string;
   actionBusy: boolean;
+  traySaving: boolean;
+  trayError: string;
+  onTrayPreferenceChange(value: boolean): void;
   theme: ThemeChoice;
   themeSaving: boolean;
   themeDisabled: boolean;
@@ -59,6 +62,9 @@ export function AirpimoSettingsDialog({
                                         saveSettings,
                                         formError,
                                         actionBusy,
+                                        traySaving,
+                                        trayError,
+                                        onTrayPreferenceChange,
                                         theme,
                                         themeSaving,
                                         themeDisabled,
@@ -238,9 +244,12 @@ export function AirpimoSettingsDialog({
                 <Switch
                     aria-label={t("关闭后驻留托盘")}
                     checked={draft.stay_in_tray}
-                    onCheckedChange={(value) => setDraft((x) => ({ ...x, stay_in_tray: value }))}
+                    disabled={actionBusy || traySaving}
+                    onCheckedChange={onTrayPreferenceChange}
                 />
               </div>
+              {traySaving && <p role="status" className="mt-1 text-[10px] text-muted-foreground">{t('正在保存托盘设置…')}</p>}
+              {trayError && <p role="alert" className="mt-1 text-[11px] text-destructive">{t(trayError)}</p>}
 
               <label htmlFor="showAdvanced" className="flex cursor-pointer items-center justify-between border-b border-border px-px py-2">
                 <span className="text-xs font-semibold">{t('高级功能')}</span>

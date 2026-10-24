@@ -163,6 +163,21 @@ impl Controller {
         self.publish(app);
         Ok(self.snapshot())
     }
+    // Persist the close-button policy without committing any unsaved receiver settings.
+    // This is a UI lifecycle preference; changing it never restarts UxPlay.
+    pub fn set_stay_in_tray(self: &Arc<Self>, app: &AppHandle, stay_in_tray: bool) -> Result<Snapshot,String> {
+        {
+            let mut inner = self.inner.lock().unwrap();
+            if inner.settings.stay_in_tray == stay_in_tray { return Ok(inner.snapshot()); }
+            let mut next = inner.settings.clone();
+            next.stay_in_tray = stay_in_tray;
+            settings::save(&self.settings_path, &next)?;
+            inner.settings = next;
+            inner.log("tray_preference_saved");
+        }
+        self.publish(app);
+        Ok(self.snapshot())
+    }
     pub fn diagnostics(&self) -> String {
         let inner = self.inner.lock().unwrap();
         format!("AIRPIMO / LOCAL DIAGNOSTICS\nGenerated Unix time: {}\nStatus: {}\nProcess running: {}\nDiscovery externally verified: false\nAudio externally verified: false\nRecovery attempts: {}\nDevice name intentionally omitted from log\n\n{}\n",

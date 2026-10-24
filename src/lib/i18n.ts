@@ -38,6 +38,7 @@ const english: Record<string, string> = {
   '画面亮度': 'Image brightness', '当前画面亮度': 'Current brightness',
   '重启接收服务后生效': 'Applies after restarting the receiver',
   '启动时开启接收': 'Start receiving on launch', '启动软件时自动开启接收服务': 'Automatically start the receiver when the app opens',
+  '正在保存托盘设置…': 'Saving tray preference…', '保存托盘设置失败': 'Failed to save tray preference',
   '关闭后驻留托盘': 'Keep running in tray on close', '开启：关闭窗口后隐藏到托盘。关闭：退出软件。': 'On: hide to tray when closed. Off: quit the app.',
   '高级功能': 'Advanced options', 'UxPlay 自定义启动参数（高级）': 'Custom UxPlay launch arguments (advanced)',
   '例如：-vol 0.7 -vsync no': 'Example: -vol 0.7 -vsync no',
