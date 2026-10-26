@@ -1,9 +1,10 @@
 {
   "name": "airpimo",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "Airpimo — cross-platform AirPlay receiver powered by UxPlay",
+  "author": "rfw",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
