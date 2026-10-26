@@ -26,7 +26,18 @@ function planVersionSync(root=projectRoot){
   const tauri=readFileSync(tauriPath,'utf8');
   const tauriData=JSON.parse(tauri);
   if(typeof tauriData.version!=='string')throw new Error('BLOCKED: invalid Tauri config version');
-  const newTauri=replaceExactlyOnce(tauri, /^(\s{2}"version"\s*:\s*")([^"]+)(")/m,(_whole,start,_current,end)=>start+version+end,'tauri.conf.json');
+  // When Tauri inherits the npm version, preserve its version reference.
+  // Changing it back to a literal would break the single-source version model.
+  // Only the known in-repository reference is allowed here; other references
+  // remain a deliberate failure rather than rewriting an arbitrary path.
+  let newTauri;
+  if(tauriData.version==='../package.json'){
+    newTauri=tauri;
+  }else if(versionPattern.test(tauriData.version)){
+    newTauri=replaceExactlyOnce(tauri, /^(\s{2}"version"\s*:\s*")([^"]+)(")/m,(_whole,start,_current,end)=>start+version+end,'tauri.conf.json');
+  }else{
+    throw new Error(`BLOCKED: unsupported Tauri version reference ${JSON.stringify(tauriData.version)}`);
+  }
   changes.push({path:tauriPath,before:tauri,after:newTauri,old:tauriData.version});
 
   const cargoPath=join(root,'src-tauri','Cargo.toml');

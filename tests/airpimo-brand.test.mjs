@@ -20,7 +20,14 @@ test('Airpimo release package, bundle identifier and Rust crate agree',()=>{
   assert.match(read('src-tauri/Cargo.toml'),/^name = "airpimo_lib"/m);
   assert.match(read('src-tauri/Cargo.lock'),/^name = "airpimo"/m);
   assert.match(read('src-tauri/src/main.rs'),/airpimo_lib::run\(\)/);
-  assert.equal(config.version,pkg.version);
+  // Tauri v2 accepts either an explicit version or a package.json reference.
+  // Resolve the source file before comparing the effective release version.
+  const tauriVersion = config.version === '../package.json'
+    ? json('package.json').version
+    : config.version;
+  assert.equal(tauriVersion,pkg.version);
+  assert.equal(lock.version,pkg.version,'package-lock.json top-level version must match package.json');
+  assert.equal(lock.packages[''].version,pkg.version,'package-lock.json root package version must match package.json');
 });
 
 test('Airpimo UI, configurable receiver, diagnostics and settings migration are consistent',()=>{
