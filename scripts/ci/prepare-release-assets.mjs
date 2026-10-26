@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // Pure Node release gate: validate tag/version and turn four audited artifacts
 // into uniquely named GitHub Release assets with SHA-256 provenance.
-import {createReadStream, readFileSync, readdirSync, lstatSync, mkdirSync, copyFileSync, openSync, readSync, closeSync, writeFileSync, existsSync} from 'node:fs';
+import {createReadStream, readFileSync, readdirSync, lstatSync, mkdirSync, copyFileSync, openSync, readSync, closeSync, writeFileSync, existsSync, realpathSync} from 'node:fs';
 import {createHash} from 'node:crypto';
-import {dirname, join, resolve, extname} from 'node:path';
+import {dirname, join, resolve, extname, basename, relative, sep, isAbsolute} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {finished} from 'node:stream/promises';
 
@@ -15,6 +15,40 @@ const specs=Object.freeze([
   {folder:'macos-arm64',name:'macos-arm64',target:'aarch64-apple-darwin',extension:'.dmg'},
 ]);
 
+// Match Tauri v2's supported `version` forms: an explicit semver string or
+// a path (relative to src-tauri/) to a package.json containing `version`.
+// Keep the release gate confined to the checked-out repository: publishing
+// must not depend on an arbitrary file outside the release source tree.
+function resolvedTauriVersion(configuredVersion, projectRoot) {
+  if (typeof configuredVersion !== 'string' || !configuredVersion.trim()) {
+    throw new Error('BLOCKED: tauri.conf.json has no valid version');
+  }
+  if (/^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?$/.test(configuredVersion)) {
+    return configuredVersion;
+  }
+  const source=resolve(projectRoot,'src-tauri',configuredVersion);
+  const rel=relative(projectRoot,source);
+  if (basename(source)!=='package.json' || rel==='..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
+    throw new Error(`BLOCKED: Unsupported tauri.conf.json version reference ${JSON.stringify(configuredVersion)}`);
+  }
+  let referenced;
+  try {
+    const realSource=realpathSync(source);
+    const realRoot=realpathSync(projectRoot);
+    const realRel=relative(realRoot,realSource);
+    if (realRel==='..' || realRel.startsWith(`..${sep}`) || isAbsolute(realRel)) {
+      throw new Error('version reference resolves outside the project');
+    }
+    referenced=JSON.parse(readFileSync(realSource,'utf8'));
+  } catch (cause) {
+    throw new Error(`BLOCKED: Cannot read tauri.conf.json version reference ${JSON.stringify(configuredVersion)}: ${cause.message}`);
+  }
+  if (typeof referenced?.version!=='string' || !referenced.version.trim()) {
+    throw new Error(`BLOCKED: tauri.conf.json version reference ${JSON.stringify(configuredVersion)} lacks a version field`);
+  }
+  return referenced.version;
+}
+
 export function verifyReleaseTag(tag,projectRoot=defaultRoot){
   if (!/^v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?$/.test(tag??'')) {
     throw new Error(`BLOCKED: Expected version tag vMAJOR.MINOR.PATCH[-prerelease], got ${JSON.stringify(tag)}`);
@@ -25,10 +59,12 @@ export function verifyReleaseTag(tag,projectRoot=defaultRoot){
   const version=tag.slice(1);
   const baseVersion=version.split('-')[0];
   const packageVersion=JSON.parse(readFileSync(join(projectRoot,'package.json'),'utf8')).version;
-  const tauriVersion=JSON.parse(readFileSync(join(projectRoot,'src-tauri','tauri.conf.json'),'utf8')).version;
+  const configuredTauriVersion=JSON.parse(readFileSync(join(projectRoot,'src-tauri','tauri.conf.json'),'utf8')).version;
+  const tauriVersion=resolvedTauriVersion(configuredTauriVersion,resolve(projectRoot));
   const cargo=readFileSync(join(projectRoot,'src-tauri','Cargo.toml'),'utf8');
   const cargoVersion=cargo.match(/^version\s*=\s*"([^"]+)"/m)?.[1];
-  const metadata=[['package.json',packageVersion],['tauri.conf.json',tauriVersion],['Cargo.toml',cargoVersion]];
+  const tauriLabel=configuredTauriVersion===tauriVersion?'tauri.conf.json':`tauri.conf.json (${configuredTauriVersion})`;
+  const metadata=[['package.json',packageVersion],[tauriLabel,tauriVersion],['Cargo.toml',cargoVersion]];
   for(const [name,found] of metadata){
     if(found!==baseVersion && found!==version)
       throw new Error(`BLOCKED: ${tag} does not match ${name} version ${found??'(missing)'}`);

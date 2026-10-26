@@ -61,6 +61,47 @@ test('release tag validation allows matching RC project metadata but rejects a d
   assert.throws(()=>verifyReleaseTag('v0.1.0-rc.3',project),/Project versions differ/);
 }));
 
+test('tauri.conf.json version can reference ../package.json, including RC tags',()=>fixture(dir=>{
+  const project=join(dir,'project'),tauri=join(project,'src-tauri');mkdirSync(tauri,{recursive:true});
+  const write=(pkg,config,cargo)=>{
+    writeFileSync(join(project,'package.json'),JSON.stringify({version:pkg}));
+    writeFileSync(join(tauri,'tauri.conf.json'),JSON.stringify({version:config}));
+    writeFileSync(join(tauri,'Cargo.toml'),`[package]\nversion = "${cargo}"\n`);
+  };
+  write('0.2.0','../package.json','0.2.0');
+  assert.equal(verifyReleaseTag('v0.2.0',project),'0.2.0');
+  assert.equal(verifyReleaseTag('v0.2.0-rc.2',project),'0.2.0-rc.2');
+  assert.throws(()=>verifyReleaseTag('v0.3.0-rc.1',project),/does not match package.json version 0.2.0/);
+  write('0.2.0-rc.2','../package.json','0.2.0-rc.2');
+  assert.equal(verifyReleaseTag('v0.2.0-rc.2',project),'0.2.0-rc.2');
+  assert.throws(()=>verifyReleaseTag('v0.2.0-rc.3',project),/does not match/);
+  write('0.2.0','../package.json','0.2.1');
+  assert.throws(()=>verifyReleaseTag('v0.2.0-rc.2',project),/does not match Cargo.toml/);
+}));
+
+test('Tauri version file references fail closed for missing, malformed, or out-of-project files',()=>fixture(dir=>{
+  const project=join(dir,'project'),tauri=join(project,'src-tauri');mkdirSync(tauri,{recursive:true});
+  writeFileSync(join(project,'package.json'),JSON.stringify({version:'0.2.0'}));
+  writeFileSync(join(tauri,'Cargo.toml'),'[package]\nversion = "0.2.0"\n');
+  const config=value=>writeFileSync(join(tauri,'tauri.conf.json'),JSON.stringify({version:value}));
+  config('../missing/package.json');
+  assert.throws(()=>verifyReleaseTag('v0.2.0-rc.2',project),/Cannot read tauri.conf.json version reference/);
+  config('../../outside/package.json');
+  assert.throws(()=>verifyReleaseTag('v0.2.0-rc.2',project),/Unsupported tauri.conf.json version reference/);
+  config('../Cargo.toml');
+  assert.throws(()=>verifyReleaseTag('v0.2.0-rc.2',project),/Unsupported tauri.conf.json version reference/);
+  config(null);
+  assert.throws(()=>verifyReleaseTag('v0.2.0-rc.2',project),/has no valid version/);
+  const nested=join(project,'versions');mkdirSync(nested);
+  writeFileSync(join(nested,'package.json'),'not json');
+  config('../versions/package.json');
+  assert.throws(()=>verifyReleaseTag('v0.2.0-rc.2',project),/Cannot read tauri.conf.json version reference/);
+  writeFileSync(join(nested,'package.json'),JSON.stringify({name:'missing-version'}));
+  assert.throws(()=>verifyReleaseTag('v0.2.0-rc.2',project),/lacks a version field/);
+  writeFileSync(join(nested,'package.json'),JSON.stringify({version:'0.2.1'}));
+  assert.throws(()=>verifyReleaseTag('v0.2.0-rc.2',project),/does not match tauri.conf.json \(..\/versions\/package.json\) version 0.2.1/);
+}));
+
 test('one complete four-platform release generates unique assets and digest list',()=>fixture(async dir=>{
   const input=join(dir,'input'),out=join(dir,'release');makeFour(input);
   const assets=await prepareReleaseAssets({tag:currentTag,input,out,projectRoot:root,sourceCommit:'a'.repeat(40)});
