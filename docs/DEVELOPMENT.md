@@ -55,3 +55,22 @@ Apple Silicon 使用对应 `aarch64-apple-darwin` target。实际命令与资源
 - Windows 原生错误码 `0xC0000135` 通常需要检查 Sidecar 和插件搜索路径及缺失 DLL。
 
 开发者必须区分静态测试、平台构建测试和真实 AirPlay 连接测试。
+
+
+## 本地模拟投屏（仅开发模式）
+
+使用 `npm run desktop:dev` 启动，在「设置 → 诊断」底部点击「开始模拟投屏」。
+开发构建会启动 `gst-launch-1.0` 的 `videotestsrc` 动态画面，并使用 Airpimo Player
+已有的 Windows 窗口标题/全屏管理或 macOS 原生窗口辅助库。**这不是 AirPlay 协议测试**。
+
+- 开发电脑需安装 GStreamer，且 `gst-launch-1.0` 可从 PATH 启动；可用环境变量
+  `AIRPIMO_DEV_GST_LAUNCH` 指定其绝对路径，或沿用 `UXPLAY_DEV_GST_ROOT`。
+- 如果项目已经暂存完整 GStreamer Runtime，会优先使用该 Runtime 的 `bin/gst-launch-1.0`。
+- 模拟前若当前正在真实镜像/握手，入口会拒绝开始。其他情况下暂时停止真实接收服务，
+  模拟结束、关闭播放器窗口或播放器异常退出后恢复原先是否开启接收的状态。
+- 进入模拟时真实 AirPlay 网络端口不再监听；它不写入任何用户配置。
+- 验证电源请求：Windows 使用 `powercfg /requests`，macOS 使用 `pmset -g assertions`；
+  在模拟时请求应存在，停止时应释放。
+- Release 构建不会注册模拟 IPC；前端模拟按钮不在生产界面显示。
+
+需要测试 AirPlay 网络协议或真实 H.264/音频协商时仍应使用实际发送端。

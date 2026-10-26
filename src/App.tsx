@@ -32,6 +32,8 @@ function App() {
   const [releaseOpening, setReleaseOpening] = useState(false);
   const updateRequest = useRef(0);
   const [diagnostics, setDiagnostics] = useState('');
+  const [simulationBusy, setSimulationBusy] = useState(false);
+  const [simulationError, setSimulationError] = useState('');
   const [diagnosticsExportStatus, setDiagnosticsExportStatus] = useState('');
   const [diagnosticsExporting, setDiagnosticsExporting] = useState(false);
   const [feedback, setFeedback] = useState('');
@@ -276,6 +278,18 @@ function App() {
     }
   }
 
+  async function toggleSimulation() {
+    if (!import.meta.env.DEV || simulationBusy || !isDesktop()) return;
+    setSimulationBusy(true);
+    setSimulationError('');
+    try {
+      const simulator = await import('./lib/dev-simulation');
+      const next = snapshot.simulated ? await simulator.stop() : await simulator.start();
+      applyNativeSnapshot(next);
+    } catch (error) { setSimulationError(String(error)); }
+    finally { setSimulationBusy(false); }
+  }
+
   async function copy(value: string) {
     try { await copyText(value); setFeedback('复制成功'); }
     catch (error) { setFeedback(String(error)); }
@@ -320,6 +334,11 @@ function App() {
       exportDiagnostics={exportDiagnostics}
       diagnosticsExportStatus={diagnosticsExportStatus}
       diagnosticsExporting={diagnosticsExporting}
+      simulationAvailable={import.meta.env.DEV && isDesktop()}
+      simulationActive={snapshot.simulated === true}
+      simulationBusy={simulationBusy}
+      simulationError={simulationError}
+      toggleSimulation={toggleSimulation}
     />
     <AirpimoUpdateNotice
       updateNoticeOpen={updateNoticeOpen}

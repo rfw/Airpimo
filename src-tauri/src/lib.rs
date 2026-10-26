@@ -27,6 +27,18 @@ fn set_stay_in_tray(app: AppHandle, stay_in_tray: bool) -> Result<Snapshot,Strin
     controller(&app).set_stay_in_tray(&app, stay_in_tray)
 }
 
+// Debug-only IPCs are intentionally absent from production executables.
+#[cfg(debug_assertions)]
+#[tauri::command]
+fn start_simulated_mirroring(app: AppHandle) -> Result<Snapshot, String> {
+    controller(&app).start_simulation(&app)
+}
+#[cfg(debug_assertions)]
+#[tauri::command]
+fn stop_simulated_mirroring(app: AppHandle) -> Snapshot {
+    controller(&app).stop_simulation(&app)
+}
+
 // The main-window X uses persisted native settings, never an unsaved frontend draft.
 // Both macOS (where closing a window normally leaves the app running) and Windows
 // must explicitly take the same action for the same user preference.
@@ -170,7 +182,7 @@ fn configure_windows_taskbar_id() {
 pub fn run() {
     #[cfg(windows)]
     configure_windows_taskbar_id();
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app,_,_| show_main(app)))
         .on_tray_icon_event(|app,event| {
             match event {
@@ -199,8 +211,12 @@ pub fn run() {
             if should_start { core.start(app.handle(),true); }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_snapshot,open_project_page,get_settings,set_theme,set_stay_in_tray,start_receiving,stop_receiving,retry_receiving,save_settings,get_diagnostics,export_diagnostics,open_release_page])
-        .on_window_event(|window,event| {
+        ;
+    #[cfg(debug_assertions)]
+    let builder = builder.invoke_handler(tauri::generate_handler![get_snapshot,open_project_page,get_settings,set_theme,set_stay_in_tray,start_receiving,stop_receiving,retry_receiving,save_settings,get_diagnostics,export_diagnostics,open_release_page,start_simulated_mirroring,stop_simulated_mirroring]);
+    #[cfg(not(debug_assertions))]
+    let builder = builder.invoke_handler(tauri::generate_handler![get_snapshot,open_project_page,get_settings,set_theme,set_stay_in_tray,start_receiving,stop_receiving,retry_receiving,save_settings,get_diagnostics,export_diagnostics,open_release_page]);
+    builder.on_window_event(|window,event| {
             if window.label() != "main" { return; }
             if let WindowEvent::CloseRequested {api,..}=event {
                 // Suppress Tauri's default window destruction on both platforms.

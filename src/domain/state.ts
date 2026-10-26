@@ -11,6 +11,7 @@ export interface Snapshot {
   applied_fps: number | null;
   applied_uxplay_args: string | null;
   process_running: boolean;
+  simulated?: boolean;
   discovery_verified: boolean;
   audio_verified: boolean;
   connected_since: number | null;

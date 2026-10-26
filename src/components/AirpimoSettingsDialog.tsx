@@ -42,6 +42,11 @@ interface SettingsDialogProps {
   exportDiagnostics(): Promise<void>;
   diagnosticsExportStatus: string;
   diagnosticsExporting: boolean;
+  simulationAvailable: boolean;
+  simulationActive: boolean;
+  simulationBusy: boolean;
+  simulationError: string;
+  toggleSimulation(): Promise<void>;
 }
 
 function useDialogPosition() {
@@ -82,6 +87,11 @@ export function AirpimoSettingsDialog({
                                         exportDiagnostics,
                                         diagnosticsExportStatus,
                                         diagnosticsExporting,
+                                        simulationAvailable,
+                                        simulationActive,
+                                        simulationBusy,
+                                        simulationError,
+                                        toggleSimulation,
                                       }: SettingsDialogProps) {
   const { t, choice, setChoice } = useI18n();
   const { dialogClass, overlayClass } = useDialogPosition();
@@ -469,7 +479,7 @@ export function AirpimoSettingsDialog({
                 hidden={settingsTab !== "diagnostics"}
                 className={panelClasses(
                     "diagnostics",
-                    "flex flex-col overflow-hidden [&_textarea]:min-h-[90px] [&_textarea]:flex-1",
+                    "flex flex-col overflow-y-auto [&_textarea]:min-h-[96px] [&_textarea]:flex-1",
                 )}
             >
             <textarea
@@ -511,6 +521,27 @@ export function AirpimoSettingsDialog({
                         ? `${t("导出失败")}：${diagnosticsExportStatus.slice("导出失败：".length)}`
                         : t(diagnosticsExportStatus)}
                   </p>
+              )}
+              {simulationAvailable && (
+                <div className="mt-4 shrink-0 rounded-lg border border-border bg-muted/40 px-3 py-3" data-testid="dev-simulated-mirroring">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="m-0 text-xs font-semibold text-foreground">{t('模拟投屏测试')}</p>
+                      <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                        {t('使用 GStreamer 测试画面打开 Airpimo Player。模拟期间暂停真实接收，结束后恢复原状态。')}
+                      </p>
+                      <p className="mt-1 text-[11px] text-muted-foreground" role="status">
+                        {simulationActive ? t('模拟投屏中') : t('未启动模拟')}
+                      </p>
+                    </div>
+                    <Button type="button" variant={simulationActive ? "outline" : "default"}
+                      disabled={simulationBusy} onClick={() => void toggleSimulation()}>
+                      {simulationBusy ? t('处理中…') : simulationActive ? t('结束模拟') : t('开始模拟投屏')}
+                    </Button>
+                  </div>
+                  {simulationError && <p className="mt-2 break-words text-[11px] text-destructive" role="alert">{simulationError}</p>}
+                  <p className="mt-2 text-[10px] text-muted-foreground">{t('仅开发模式可用，正式安装包不包含模拟入口。')}</p>
+                </div>
               )}
             </section>
 

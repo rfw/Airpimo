@@ -48,6 +48,8 @@ pub struct Snapshot {
     audio_verified: bool,
     connected_since: Option<u64>,
     restart_attempts: u8,
+    #[cfg(debug_assertions)]
+    simulated: bool,
     settings: Settings,
 }
 struct Inner {
@@ -69,7 +71,19 @@ struct Inner {
     connecting_at: Option<Instant>,
     logs: VecDeque<String>,
     power_inhibitor: Option<PowerInhibitor>,
+    #[cfg(debug_assertions)]
+    simulation: Option<DevSimulation>,
+    #[cfg(debug_assertions)]
+    simulation_pending: bool,
 }
+#[cfg(debug_assertions)]
+struct DevSimulation {
+    child: Child,
+    resume_receiver: bool,
+    #[cfg(windows)]
+    job: crate::windows_job::ReceiverJob,
+}
+
 impl Inner {
     fn snapshot(&self) -> Snapshot {
         Snapshot {
@@ -77,8 +91,13 @@ impl Inner {
             device_name: self.settings.device_name.clone(), applied_device_name: self.applied_device_name.clone(),
             applied_fps: self.applied_fps,
             applied_uxplay_args: self.applied_uxplay_args.clone(),
-            process_running: self.child.is_some(), discovery_verified: false, audio_verified: false,
+            process_running: {
+                #[cfg(debug_assertions)] { self.child.is_some() || self.simulation.is_some() }
+                #[cfg(not(debug_assertions))] { self.child.is_some() }
+            }, discovery_verified: false, audio_verified: false,
             connected_since: self.connected_since, restart_attempts: self.restart_attempts,
+            #[cfg(debug_assertions)]
+            simulated: self.simulation.is_some(),
             settings: self.settings.clone(),
         }
     }
@@ -87,7 +106,11 @@ impl Inner {
         self.logs.push_back(format!("{} | {}", unix_now(), key));
     }
     fn sync_display_awake(&mut self) {
-        if !should_keep_display_awake(self.stage, self.child.is_some(), self.stopping) {
+        #[cfg(debug_assertions)]
+        let running = self.child.is_some() || self.simulation.is_some();
+        #[cfg(not(debug_assertions))]
+        let running = self.child.is_some();
+        if !should_keep_display_awake(self.stage, running, self.stopping) {
             // Drop releases both Windows power requests or the macOS IOKit assertion.
             self.power_inhibitor = None;
         } else if self.power_inhibitor.is_none() {
@@ -113,13 +136,19 @@ impl Controller {
             #[cfg(windows)] receiver_job:None,
             epoch:0, stopping:true, restart_attempts:0, applied_device_name:None, applied_fps:None, applied_uxplay_args:None,
             connected_since:None, started_at:None, connecting_at:None, logs, power_inhibitor:None,
+            #[cfg(debug_assertions)] simulation:None,
+            #[cfg(debug_assertions)] simulation_pending:false,
         }), settings_path })
     }
     pub fn settings(&self) -> Settings { self.inner.lock().unwrap().settings.clone() }
     pub fn snapshot(&self) -> Snapshot { self.inner.lock().unwrap().snapshot() }
     pub(crate) fn tray_should_stop(&self) -> bool {
         let inner = self.inner.lock().unwrap();
-        tray_should_stop(inner.stage, inner.child.is_some())
+        #[cfg(debug_assertions)]
+        let running = inner.child.is_some() || inner.simulation.is_some();
+        #[cfg(not(debug_assertions))]
+        let running = inner.child.is_some();
+        tray_should_stop(inner.stage, running)
     }
     fn publish(&self, app: &AppHandle) {
         // Reconcile the OS power assertion before publishing every lifecycle
@@ -180,20 +209,167 @@ impl Controller {
     pub fn diagnostics(&self) -> String {
         let inner = self.inner.lock().unwrap();
         format!("AIRPIMO / LOCAL DIAGNOSTICS\nGenerated Unix time: {}\nStatus: {}\nProcess running: {}\nDiscovery externally verified: false\nAudio externally verified: false\nRecovery attempts: {}\nDevice name intentionally omitted from log\n\n{}\n",
-            unix_now(), inner.stage, inner.child.is_some(), inner.restart_attempts,
+            unix_now(), inner.stage, {
+                #[cfg(debug_assertions)] { inner.child.is_some() || inner.simulation.is_some() }
+                #[cfg(not(debug_assertions))] { inner.child.is_some() }
+            }, inner.restart_attempts,
             inner.logs.iter().cloned().collect::<Vec<_>>().join("\n"))
     }
+    // Only compiled in development builds. Launch the same GStreamer window
+    // stack as the real receiver, without opening an AirPlay network port.
+    // The real receiver is temporarily stopped and restored when the demo ends.
+    #[cfg(debug_assertions)]
+    pub fn start_simulation(self: &Arc<Self>, app: &AppHandle) -> Result<Snapshot, String> {
+        let (path, development) = simulation_gst_launch(app)?;
+        let mut command = Command::new(path);
+        command.args(["-q", "videotestsrc", "is-live=true", "pattern=ball",
+            "!", "videoconvert", "!", "autovideosink"])
+            .stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null());
+        setup_gstreamer(app, &mut command, development)?;
+        #[cfg(target_os = "macos")]
+        setup_mac_video_controls(app, &mut command, true)?;
+        #[cfg(windows)]
+        command.creation_flags(CREATE_NO_WINDOW);
+
+        let resume = {
+            let mut i = self.inner.lock().unwrap();
+            if i.simulation.is_some() || i.simulation_pending {
+                return Err("模拟投屏已在运行或启动中".into());
+            }
+            if i.stage == "connected" || i.stage == "connecting" {
+                return Err("请先断开真实投屏连接，再启动模拟测试".into());
+            }
+            i.simulation_pending = true;
+            i.child.is_some() || i.stage == "starting"
+        };
+        // Keep the launch reservation while stopping the real receiver;
+        // another tray/UI Start must not race between stop and the demo spawn.
+        self.stop_internal(app, true);
+        let mut child = match command.spawn() {
+            Ok(c) => c,
+            Err(err) => {
+                self.simulation_failed(app, resume);
+                return Err(format!("无法启动 GStreamer 测试播放器：{err}。请检查 gst-launch-1.0 是否已安装"));
+            }
+        };
+        #[cfg(windows)]
+        let job = match crate::windows_job::ReceiverJob::attach(&child) {
+            Ok(job) => job,
+            Err(err) => {
+                let _ = child.kill(); let _ = child.wait();
+                self.simulation_failed(app, resume);
+                return Err(format!("无法托管模拟播放器进程：{err}"));
+            }
+        };
+        let pid = child.id();
+        let output = child.stdout.take();
+        {
+            let mut i = self.inner.lock().unwrap();
+            i.simulation = Some(DevSimulation {
+                child, resume_receiver: resume,
+                #[cfg(windows)] job,
+            });
+            i.simulation_pending = false;
+            i.stopping = false;
+            i.stage = "connected";
+            i.detail = "开发测试：模拟投屏中（未连接 AirPlay）".into();
+            i.connected_since = Some(unix_now());
+            i.issue = None;
+            i.log("dev_simulated_mirror_started");
+        }
+        self.publish(app);
+        #[cfg(windows)] {
+            let owner = self.clone(); let app_clone = app.clone();
+            crate::windows_player::watch(pid, move || {
+                owner.stop_simulation_for_pid(&app_clone, pid);
+                true
+            });
+        }
+        if let Some(output) = output {
+            let owner = self.clone(); let app_clone = app.clone();
+            thread::spawn(move || {
+                for line in BufReader::new(output).lines() {
+                    if matches!(line, Ok(ref value) if value.trim() == "AIRPIMO_PLAYER_WINDOW_HIDDEN") {
+                        owner.stop_simulation_for_pid(&app_clone, pid);
+                        break;
+                    }
+                }
+            });
+        }
+        {
+            let owner = self.clone(); let app_clone = app.clone();
+            thread::spawn(move || loop {
+                thread::sleep(Duration::from_millis(250));
+                let exited = {
+                    let mut i = owner.inner.lock().unwrap();
+                    match i.simulation.as_mut() {
+                        Some(sim) if sim.child.id() == pid =>
+                            match sim.child.try_wait() { Ok(Some(_)) | Err(_) => true, _ => false },
+                        _ => return,
+                    }
+                };
+                if exited { owner.stop_simulation_for_pid(&app_clone, pid); return; }
+            });
+        }
+        Ok(self.snapshot())
+    }
+    #[cfg(debug_assertions)]
+    fn simulation_failed(self: &Arc<Self>, app: &AppHandle, resume: bool) {
+        self.inner.lock().unwrap().simulation_pending = false;
+        if resume { self.start(app, true); }
+    }
+    #[cfg(debug_assertions)]
+    fn stop_simulation_for_pid(self: &Arc<Self>, app: &AppHandle, pid: u32) -> Snapshot {
+        let simulation = {
+            let mut i = self.inner.lock().unwrap();
+            if i.simulation.as_ref().map(|sim| sim.child.id()) != Some(pid) {
+                return i.snapshot();
+            }
+            let sim = i.simulation.take().unwrap();
+            i.stage = "stopped";
+            i.stopping = true;
+            i.detail = "模拟投屏已结束".into();
+            i.connected_since = None;
+            i.power_inhibitor = None;
+            i.log("dev_simulated_mirror_ended");
+            sim
+        };
+        let resume = simulation.resume_receiver;
+        let mut child = simulation.child;
+        let _ = child.kill(); let _ = child.wait();
+        #[cfg(windows)]
+        drop(simulation.job);
+        self.publish(app);
+        if resume { self.start(app, true) } else { self.snapshot() }
+    }
+    #[cfg(debug_assertions)]
+    pub fn stop_simulation(self: &Arc<Self>, app: &AppHandle) -> Snapshot {
+        let pid = self.inner.lock().unwrap().simulation.as_ref().map(|s| s.child.id());
+        match pid { Some(pid) => self.stop_simulation_for_pid(app, pid), None => self.snapshot() }
+    }
     pub fn stop(self: &Arc<Self>, app: &AppHandle) -> Snapshot {
-        let (child, receiver_job) = {
+        self.stop_internal(app, false)
+    }
+    fn stop_internal(self: &Arc<Self>, app: &AppHandle, preserve_sim_pending: bool) -> Snapshot {
+        #[cfg(not(debug_assertions))]
+        let _ = preserve_sim_pending;
+        let (child, receiver_job, simulation) = {
             let mut i=self.inner.lock().unwrap();
             i.stopping=true; i.epoch+=1; i.stage="stopped"; i.detail="接收服务已停止".into();
             i.issue=None; i.connected_since=None; i.connecting_at=None; i.applied_device_name=None; i.applied_fps=None; i.applied_uxplay_args=None; i.restart_attempts=0;
             i.log("stopped_by_user"); i.power_inhibitor = None;
             #[cfg(windows)] let job=i.receiver_job.take();
             #[cfg(not(windows))] let job=();
-            (i.child.take(),job)
+            #[cfg(debug_assertions)] let sim = i.simulation.take();
+            #[cfg(not(debug_assertions))] let sim = ();
+            #[cfg(debug_assertions)] if !preserve_sim_pending { i.simulation_pending = false; }
+            (i.child.take(),job,sim)
         };
         if let Some(mut child) = child { let _ = child.kill(); let _ = child.wait(); }
+        #[cfg(debug_assertions)]
+        if let Some(mut sim) = simulation { let _ = sim.child.kill(); let _ = sim.child.wait(); }
+        #[cfg(not(debug_assertions))]
+        let _ = simulation;
         #[cfg(windows)]
         drop(receiver_job); // Close the Job Object after the receiver exits.
         #[cfg(not(windows))]
@@ -208,6 +384,8 @@ impl Controller {
     pub fn start(self: &Arc<Self>, app: &AppHandle, reset_backoff: bool) -> Snapshot {
         let (epoch, name, fps, user_args) = {
             let mut i=self.inner.lock().unwrap();
+            #[cfg(debug_assertions)]
+            if i.simulation.is_some() || i.simulation_pending { return i.snapshot(); }
             if start_already_in_progress(i.child.is_some(), i.stopping, i.stage) { return i.snapshot(); }
             i.stopping=false;
             if reset_backoff { i.restart_attempts=0; }
@@ -515,6 +693,29 @@ mod stream_tests {
 
 // This override only exists in debug builds. Production must use the shipped
 // engine and GStreamer resources; never silently fall back to Homebrew/PATH.
+#[cfg(debug_assertions)]
+fn simulation_gst_launch(app: &AppHandle) -> Result<(PathBuf, bool), String> {
+    let name = if cfg!(windows) { "gst-launch-1.0.exe" } else { "gst-launch-1.0" };
+    if let Some(requested) = std::env::var_os("AIRPIMO_DEV_GST_LAUNCH") {
+        let path = PathBuf::from(requested);
+        if !path.is_absolute() || !path.is_file() {
+            return Err("AIRPIMO_DEV_GST_LAUNCH 必须是现有 gst-launch-1.0 的绝对路径".into());
+        }
+        return Ok((path, true));
+    }
+    if let Some(root) = std::env::var_os("UXPLAY_DEV_GST_ROOT") {
+        let path = PathBuf::from(root).join("bin").join(name);
+        if path.is_file() { return Ok((path, true)); }
+    }
+    let resources = app.path().resource_dir().map_err(|e| e.to_string())?;
+    for root in [resources, Path::new(env!("CARGO_MANIFEST_DIR")).join("resources")] {
+        let path = root.join("gstreamer").join("bin").join(name);
+        if path.is_file() { return Ok((path, false)); }
+    }
+    // Developer-installed GStreamer (e.g. Homebrew) is allowed only in debug.
+    Ok((PathBuf::from(name), true))
+}
+
 fn sidecar_path(app: &AppHandle) -> Result<(PathBuf, bool), String> {
     #[cfg(debug_assertions)]
     if let Some(override_path) = std::env::var_os("UXPLAY_DEV_BINARY") {
