@@ -179,7 +179,49 @@ fn configure_windows_taskbar_id() {
     unsafe { SetCurrentProcessExplicitAppUserModelID(name.as_ptr()); }
 }
 
+// `tauri dev` launches Cargo's unbundled `airpimo` executable on macOS.
+// Its lowercase process name can become the Dock tooltip. Set the *display*
+// name before Tauri/AppKit registers the application; keep the binary filename,
+// bundle identifier and Windows installer paths unchanged.
+#[cfg(all(target_os = "macos", debug_assertions))]
+fn configure_macos_dev_dock_name() {
+    use std::{ffi::{c_char, c_void}, mem::transmute};
+    #[link(name = "objc")]
+    extern "C" {
+        fn objc_getClass(name: *const c_char) -> *mut c_void;
+        fn sel_registerName(name: *const c_char) -> *mut c_void;
+        fn objc_msgSend();
+    }
+    #[link(name = "Foundation", kind = "framework")]
+    extern "C" {}
+
+    // These selectors belong to Foundation and run before the first NSApp is
+    // created. Keep the temporary NSString retained until the setter returns.
+    unsafe {
+        type SendId = unsafe extern "C" fn(*mut c_void, *mut c_void) -> *mut c_void;
+        type SendCString = unsafe extern "C" fn(*mut c_void, *mut c_void, *const c_char) -> *mut c_void;
+        type SendVoid = unsafe extern "C" fn(*mut c_void, *mut c_void, *mut c_void);
+        type SendRelease = unsafe extern "C" fn(*mut c_void, *mut c_void);
+        let send_id: SendId = transmute(objc_msgSend as *const ());
+        let send_cstring: SendCString = transmute(objc_msgSend as *const ());
+        let send_void: SendVoid = transmute(objc_msgSend as *const ());
+        let send_release: SendRelease = transmute(objc_msgSend as *const ());
+        let process_class = objc_getClass(b"NSProcessInfo\0".as_ptr().cast());
+        let string_class = objc_getClass(b"NSString\0".as_ptr().cast());
+        if process_class.is_null() || string_class.is_null() { return; }
+        let process = send_id(process_class, sel_registerName(b"processInfo\0".as_ptr().cast()));
+        let string = send_id(string_class, sel_registerName(b"alloc\0".as_ptr().cast()));
+        if process.is_null() || string.is_null() { return; }
+        let name = send_cstring(string, sel_registerName(b"initWithUTF8String:\0".as_ptr().cast()), b"Airpimo\0".as_ptr().cast());
+        if name.is_null() { return; }
+        send_void(process, sel_registerName(b"setProcessName:\0".as_ptr().cast()), name);
+        send_release(name, sel_registerName(b"release\0".as_ptr().cast()));
+    }
+}
+
 pub fn run() {
+    #[cfg(all(target_os = "macos", debug_assertions))]
+    configure_macos_dev_dock_name();
     #[cfg(windows)]
     configure_windows_taskbar_id();
     let builder = tauri::Builder::default()

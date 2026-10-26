@@ -1,8 +1,8 @@
 // Development-only macOS app identity for the UxPlay child process.
 // The original engine and native cache are never renamed or modified.
 // A genuine .app bundle gives AppKit/LaunchServices the name BEFORE creating
-// the first video window; setProcessName and NSWindow.title alone are too late
-// to reliably change the app menu and Dock tooltip.
+// the first video window. Do not ship the main app icon for this *separate* player:
+// without CFBundleIconFile, macOS supplies its standard application icon.
 import {createHash} from 'node:crypto';
 import {copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync,
   statSync, writeFileSync} from 'node:fs';
@@ -20,7 +20,6 @@ export function macDevPlayerPlist() {
 <key>CFBundleExecutable</key><string>Airpimo Player</string>
 <key>CFBundleName</key><string>Airpimo Player</string>
 <key>CFBundleDisplayName</key><string>Airpimo Player</string>
-<key>CFBundleIconFile</key><string>icon.icns</string>
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
 `;
@@ -31,21 +30,23 @@ const digest = path => createHash('sha256').update(readFileSync(path)).digest('h
 export function prepareMacDevPlayerApp(root, enginePath, {platform = process.platform} = {}) {
   if (platform !== 'darwin') return enginePath;
   const engine = resolve(enginePath);
-  if (!existsSync(engine) || !statSync(engine).isFile() || !(statSync(engine).mode & 0o111)) {
+  // Windows runs these cross-platform bundle tests with a simulated darwin
+  // target, but its filesystem does not provide meaningful Unix execute bits.
+  // Preserve the real execute-bit gate on macOS (and other POSIX test hosts).
+  if (!existsSync(engine) || !statSync(engine).isFile() ||
+      (process.platform !== 'win32' && !(statSync(engine).mode & 0o111))) {
     throw new Error(`macOS 开发播放器源文件不可执行：${engine}`);
   }
-  const icon = join(root, 'src-tauri', 'icons', 'icon.icns');
-  if (!existsSync(icon)) throw new Error('macOS 开发播放器缺少 icon.icns');
   const app = join(root, APP_REL);
   const binary = join(app, 'Contents', 'MacOS', PLAYER_NAME);
   const plist = join(app, 'Contents', 'Info.plist');
-  const iconDest = join(app, 'Contents', 'Resources', 'icon.icns');
   const identity = join(app, 'Contents', 'Resources', '.airpimo-dev-source.json');
-  const receipt = JSON.stringify({source:engine, binarySha256:digest(engine), iconSha256:digest(icon)});
-  if (existsSync(binary) && existsSync(plist) && existsSync(iconDest) && existsSync(identity) &&
+  const receipt = JSON.stringify({source:engine, binarySha256:digest(engine)});
+  if (existsSync(binary) && existsSync(plist) && existsSync(identity) &&
       readFileSync(identity, 'utf8') === receipt &&
       readFileSync(plist, 'utf8') === macDevPlayerPlist() &&
-      digest(binary) === digest(engine) && digest(iconDest) === digest(icon)) {
+      digest(binary) === digest(engine) &&
+      !existsSync(join(app, 'Contents', 'Resources', 'icon.icns'))) {
     return binary;
   }
 
@@ -59,7 +60,6 @@ export function prepareMacDevPlayerApp(root, enginePath, {platform = process.pla
     mkdirSync(join(tmp, 'Contents', 'MacOS'), {recursive:true});
     mkdirSync(join(tmp, 'Contents', 'Resources'), {recursive:true});
     copyFileSync(engine, join(tmp, 'Contents', 'MacOS', PLAYER_NAME));
-    copyFileSync(icon, join(tmp, 'Contents', 'Resources', 'icon.icns'));
     writeFileSync(join(tmp, 'Contents', 'Info.plist'), macDevPlayerPlist());
     writeFileSync(join(tmp, 'Contents', 'Resources', '.airpimo-dev-source.json'), receipt);
     if (digest(join(tmp, 'Contents', 'MacOS', PLAYER_NAME)) !== digest(engine)) {

@@ -26,7 +26,9 @@ npm run tauri dev
 以 `CFBundleName` / `CFBundleDisplayName` 和 `Airpimo Player` 可执行文件名供 macOS
 在创建窗口之前识别菜单栏及 Dock 身份。
 它不会修改或重新编译原始 `uxplay`，也不参与正式发布包构建。
-副本在原始引擎或图标变更后自动更新；使用新行为需完全退出原播放器再重启 `desktop:dev`。
+副本在原始引擎变更后自动更新；为避免和主程序图标混淆，播放器不打包主程序的 `icon.icns`，由 macOS 显示默认应用图标。已有旧图标会在下一次准备副本时清理；使用新行为需退出原播放器后重新启动 `desktop:dev`。
+
+主程序在 `tauri dev` 中直接运行 Cargo 的小写 `airpimo` 文件。开发构建会在 AppKit 初始化前将进程显示名设置为 `Airpimo`，不修改 Cargo 产物或 Windows 发布程序名称。
 开发模式下如果使用特殊的 `@executable_path` 相对依赖，应在 Mac 实机确认复制后的加载路径。
 
 ## Windows 构建
