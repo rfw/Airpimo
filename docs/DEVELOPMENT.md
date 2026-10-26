@@ -19,6 +19,16 @@ npm run tauri dev
 
 可以使用 `npm run desktop:dev` 启动会选择本地原生运行资源的开发入口。如果接收引擎无法运行，请先检查选用的 Sidecar、GStreamer DLL/插件及其依赖，而不是关闭运行库校验。
 
+### macOS 开发模式的 Airpimo Player 名称
+
+当 `npm run desktop:dev` 使用显式 `--uxplay` 或已验证的原生引擎缓存时，
+会在 `src-tauri/target/airpimo-player-dev/Airpimo Player.app` 生成**仅用于开发的应用副本**，
+以 `CFBundleName` / `CFBundleDisplayName` 和 `Airpimo Player` 可执行文件名供 macOS
+在创建窗口之前识别菜单栏及 Dock 身份。
+它不会修改或重新编译原始 `uxplay`，也不参与正式发布包构建。
+副本在原始引擎或图标变更后自动更新；使用新行为需完全退出原播放器再重启 `desktop:dev`。
+开发模式下如果使用特殊的 `@executable_path` 相对依赖，应在 Mac 实机确认复制后的加载路径。
+
 ## Windows 构建
 
 在 PowerShell 中，根据目标选择：

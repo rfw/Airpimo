@@ -4,6 +4,7 @@
 import { spawn } from 'node:child_process';
 import { resolve, join } from 'node:path';
 import { ensureMacTitleHelper, prepareDevResourceDirectories } from './dev-macos-title.mjs';
+import { prepareMacDevPlayerApp } from './dev-macos-player-app.mjs';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
 import { findDevelopmentBinary } from './dev-native-paths.mjs';
@@ -74,7 +75,15 @@ if (doctor) {
 // The full GStreamer runtime is still required for *release* packaging.
 try {
   prepareDevResourceDirectories(root);
-  if (process.platform === 'darwin' && binary) ensureMacTitleHelper(root);
+  if (process.platform === 'darwin' && binary) {
+    ensureMacTitleHelper(root);
+    // Only an explicit/verified dev override needs a branded application
+    // identity. Staged release resources already use Airpimo Player.
+    if (injectOverride) {
+      binary = prepareMacDevPlayerApp(root, binary);
+      console.log(`[Airpimo 开发模式] macOS 播放器应用身份：${binary}`);
+    }
+  }
 } catch (e) { console.error(`ERROR: ${e.message}`); process.exit(2); }
 const cli = join(root, 'node_modules', '.bin', process.platform==='win32'?'tauri.cmd':'tauri');
 if (!existsSync(cli)) {console.error('缺少 Tauri CLI，请先运行 npm install');process.exit(2);}
