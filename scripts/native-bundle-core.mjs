@@ -15,7 +15,7 @@ export const sha256 = (data) => createHash('sha256').update(data).digest('hex');
 const must = (ok, message) => { if (!ok) throw Error(message); };
 export function safeRelative(path) {
   return typeof path === 'string' && path.length > 0 && path.length < 240 &&
-    /^(?:sidecar|gstreamer)\/[a-zA-Z0-9_.+@()/-]+$/.test(path) &&
+    (/^(?:sidecar|gstreamer)\/[a-zA-Z0-9_.+@()/-]+$/.test(path) || path === 'sidecar/Airpimo Player') &&
     !path.split('/').some(p => p === '..' || p === '.' || p === '') &&
     !path.includes('\\');
 }
@@ -33,7 +33,7 @@ export function validateManifest(manifest, { platform = process.platform, arch =
   for (const file of manifest.files) {
     must(safeRelative(file?.path) && SHA.test(file?.sha256 ?? ''), 'Invalid manifest file path or SHA');
     must(!seen.has(file.path), 'Duplicate path in native manifest'); seen.add(file.path);
-    if (file.path === `sidecar/${engineName(platform)}` || (platform==='darwin' && file.path==='sidecar/Airpimo')) engine = true;
+    if (file.path === `sidecar/${engineName(platform)}` || (platform==='darwin' && file.path==='sidecar/Airpimo Player')) engine = true;
     if (/^gstreamer\/lib\/gstreamer-1\.0\/.*\.(?:dylib|dll|so)$/.test(file.path)) plugin = true;
     if (platform === 'win32' ? /^gstreamer\/bin\/.*\.dll$/i.test(file.path)
       : /^gstreamer\/lib\/[^/]+\.(?:dylib|so)$/.test(file.path)) library = true;

@@ -10,7 +10,7 @@ function fixture(callback) {
   const folder=mkdtempSync(join(tmpdir(),'uxplay-mac-prune-'));
   const resources=join(folder,'resources'),gst=join(folder,'homebrew');
   const names=[
-    'sidecar/uxplay','gstreamer/bin/gst-inspect-1.0',
+    'sidecar/Airpimo Player','gstreamer/bin/gst-inspect-1.0',
     'gstreamer/libexec/gstreamer-1.0/gst-plugin-scanner',
     'gstreamer/lib/gstreamer-1.0/libgstcoreelements.dylib',
     'gstreamer/lib/gstreamer-1.0/libgstlibav.dylib',
@@ -44,7 +44,7 @@ function fixture(callback) {
     assert.equal(tool,'otool');
     const path=args.at(-1).replaceAll('\\','/');
     let deps=[];
-    if(path.endsWith('/sidecar/uxplay'))deps=['@rpath/libgstreamer-1.0.0.dylib'];
+    if(path.endsWith('/sidecar/Airpimo Player'))deps=['@rpath/libgstreamer-1.0.0.dylib'];
     else if(path.endsWith('/libgstcoreelements.dylib'))deps=['@rpath/libgstcodec.dylib'];
     else if(path.endsWith('/libgstcodec.dylib'))deps=['/usr/lib/libSystem.B.dylib'];
     else if(path.endsWith('.dylib'))deps=['/usr/lib/libSystem.B.dylib'];
@@ -82,7 +82,7 @@ test('macOS prune deletes only staged unused files and updates ready manifest',(
 
 test('macOS prune blocks missing reachable dependency without deleting any assets',()=>fixture(({resources,gst,run,manifestPath})=>{
   const failing=(tool,args)=>{
-    if(tool==='otool' && args.at(-1).replaceAll('\\','/').endsWith('/sidecar/uxplay'))
+    if(tool==='otool' && args.at(-1).replaceAll('\\','/').endsWith('/sidecar/Airpimo Player'))
       return {status:0,stdout:`${args.at(-1)}:\n  /usr/local/opt/icu4c@78/lib/libicuuc.78.dylib (compatibility version 1.0.0)\n`};
     return run(tool,args);
   };

@@ -355,17 +355,6 @@ impl Controller {
             let _ = self.player_window_closed(app, epoch);
             return;
         }
-        // Keep bounded, structured macOS helper diagnostics visible in Airpimo's
-        // existing diagnostic export. Previously all AIRPIMO_DOCK_* lines were
-        // discarded by the generic AirPlay event classifier.
-        #[cfg(target_os = "macos")]
-        if line.starts_with("AIRPIMO_DOCK_") && line.len() <= 160 && line.is_ascii() {
-            let mut i = self.inner.lock().unwrap();
-            if i.epoch == epoch && !i.stopping && i.child.is_some() {
-                i.log(line.trim());
-            }
-            return;
-        }
         let observation=diagnostic::classify(line);
         if observation==Observation::None {return;}
         {
@@ -537,7 +526,7 @@ fn sidecar_path(app: &AppHandle) -> Result<(PathBuf, bool), String> {
     }
     let dir = app.path().resource_dir().map_err(|e| e.to_string())?;
     #[cfg(windows)] let filename = "AirpimoPlayer.exe";
-    #[cfg(target_os = "macos")] let filename = "Airpimo";
+    #[cfg(target_os = "macos")] let filename = "Airpimo Player";
     #[cfg(all(not(windows), not(target_os = "macos")))] let filename = "uxplay";
     let path = dir.join("sidecar").join(filename);
     if path.is_file() { return Ok((path, false)); }

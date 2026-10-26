@@ -26,6 +26,7 @@ export const OPTIONAL_ELEMENTS=Object.freeze([
 ]);
 const VIDEO_SINKS=['glimagesink','osxvideosink'];
 const ENTRY=/^(sidecar|gstreamer)\/[A-Za-z0-9_.+@()/-]+$/;
+const safeEntry = name => ENTRY.test(name) || name === 'sidecar/Airpimo Player';
 const SYS=name=>name.startsWith('/usr/lib/')||name.startsWith('/System/Library/');
 function runChecked(run,tool,args) {
   const r=run(tool,args,{encoding:'utf8',timeout:20000,maxBuffer:16*1024*1024});
@@ -53,7 +54,7 @@ export function planMacPrune(resources,{gst,run=spawnSync,manifest}={}) {
   const plugins=new Map();
   for(const item of data.files??[]) {
     const name=item.path;
-    if(typeof name!=='string'||!ENTRY.test(name)||name.split('/').includes('..')||paths.has(name))
+    if(typeof name!=='string'||!safeEntry(name)||name.split('/').includes('..')||paths.has(name))
       throw Error(`Invalid or duplicate staged manifest path: ${String(name)}`);
     const full=join(root,name);
     if(!existsSync(full)||!within(root,realpathSync(full)))throw Error(`Unsafe/missing staged asset: ${name}`);
@@ -87,7 +88,7 @@ export function planMacPrune(resources,{gst,run=spawnSync,manifest}={}) {
   }
   if(!VIDEO_SINKS.some(element=>provided.includes(element)))
     failures.push('No macOS video sink (glimagesink/osxvideosink) was found in the staged runtime');
-  const sidecar=paths.has('sidecar/Airpimo')?'sidecar/Airpimo':'sidecar/uxplay';
+  const sidecar=paths.has('sidecar/Airpimo Player')?'sidecar/Airpimo Player':'sidecar/uxplay';
   const roots=[sidecar,'gstreamer/bin/gst-inspect-1.0',
     paths.has('gstreamer/libexec/gstreamer-1.0/gst-plugin-scanner')
       ?'gstreamer/libexec/gstreamer-1.0/gst-plugin-scanner'

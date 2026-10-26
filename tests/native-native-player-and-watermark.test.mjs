@@ -34,30 +34,24 @@ test('both Windows native build tracks apply adaptive watermark and Windows mDNS
   assert.equal(MDNS_WATERMARK_PATCH_SHA256,expected);
 });
 
-test('Windows player removes only UxPlay child taskbar entry, not its video window',()=>{
+test('Windows player keeps its own visible taskbar entry and ordinary video titlebar',()=>{
   const win=read('src-tauri/src/windows_player.rs');
-  assert.match(win,/suppress_child_taskbar_button\(hwnd\)/);
   assert.match(win,/GetWindowThreadProcessId/);
-  assert.match(win,/ITaskbarList/);
-  assert.match(win,/CoCreateInstance/);
-  assert.match(win,/CoUninitialize/);
-  assert.match(win,/ITaskbarListVtbl/);
-  assert.match(win,/delete_tab/);
   assert.match(win,/WS_CAPTION \| WS_SYSMENU \| WS_MAXIMIZEBOX/);
-  assert.doesNotMatch(win,/^const WS_EX_TOOLWINDOW/m);
   assert.match(win,/WS_MAXIMIZEBOX/);
   assert.match(win,/GetDoubleClickTime/);
-  assert.doesNotMatch(win,/SetWindowsHookEx|CreateRemoteThread/);
+  assert.match(win,/pub fn watch\(child_pid/);
+  assert.doesNotMatch(win,/ITaskbarList|delete_tab|suppress_child_taskbar_button|WS_EX_TOOLWINDOW|SetWindowsHookEx|CreateRemoteThread/);
 });
 
-test('macOS child helper uses Accessory activation policy without changing full-screen or safe-close logic',()=>{
+test('macOS child shows a regular Dock application without changing fullscreen or safe-close logic',()=>{
   const native=read('native/fullscreen/uxplay-fullscreen-macos.m');
-  assert.match(native,/NSApplicationActivationPolicyAccessory/);
-  assert.match(native,/\[NSApp activationPolicy\] != NSApplicationActivationPolicyAccessory/);
+  assert.match(native,/NSApplicationActivationPolicyRegular/);
+  assert.match(native,/\[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular\]/);
   assert.match(native,/AIRPIMO_PLAYER_TITLE_CHILD/);
   assert.match(native,/airpimoInstallSafeClose/);
   assert.match(native,/\[self orderOut:nil\]/);
-  assert.doesNotMatch(native,/NSApplicationActivationPolicyProhibited/);
+  assert.doesNotMatch(native,/NSApplicationActivationPolicyAccessory|NSApplicationActivationPolicyProhibited|TransformProcessType/);
 });
 
 // Win7 internal-mDNS uses a different renderer activation sequence from 1.73.7:
@@ -111,14 +105,10 @@ void select_video(void) {
   assert.throws(()=>patchResponsiveWatermarkSource(source.replace('renderer->pipeline', 'some_other_object'), options),/state contract changed/);
 });
 
-test('GStreamer may try to re-promote its macOS player to a Dock app; child guard keeps Accessory', () => {
+test('GStreamer player receives regular Dock activation without child policy interception', () => {
   const native=read('native/fullscreen/uxplay-fullscreen-macos.m');
-  assert.match(native,/\[NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory\]/);
-  assert.match(native,/policy == NSApplicationActivationPolicyRegular/);
-  assert.match(native,/AIRPIMO_DOCK_REGULAR_BLOCKED/);
-  assert.match(native,/airpimoInstallDockGuard\(\);/);
-  assert.match(native,/AIRPIMO_DOCK_GUARD_FAILED/);
+  assert.match(native,/\[NSApp setActivationPolicy:NSApplicationActivationPolicyRegular\]/);
+  assert.doesNotMatch(native,/airpimoInstallDockGuard|AIRPIMO_DOCK_GUARD_FAILED|kProcessTransformToUIElementApplication/);
   assert.match(native,/\[self orderOut:nil\]/);
-  assert.match(native,/window\.title = @"Airpimo Player"/);
-  assert.doesNotMatch(native,/NSApplicationActivationPolicyProhibited/);
+  assert.match(native,/window.title = @"Airpimo Player"/);
 });

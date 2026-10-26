@@ -79,14 +79,14 @@ test('Windows pruning blocks unbundled non-system DLLs and fails closed',()=>fix
  assert.equal(plan.ok,false);
  assert.match(plan.problems.join('\n'),/missing-custom.dll/);
 }));
-test('macOS player is Airpimo and Windows installer player is AirpimoPlayer while audited caches remain uxplay',()=>{
+test('macOS player is Airpimo Player and Windows installer player is AirpimoPlayer while audited caches remain uxplay',()=>{
  const root=resolve(import.meta.dirname,'..');
  const read=path=>readFileSync(join(root,path),'utf8');
- assert.match(read('scripts/stage-native.mjs'),/stagedBinName=os==='darwin'\?'Airpimo':binName/);
- assert.match(read('src-tauri/src/receiver.rs'),/\#\[cfg\(target_os = "macos"\)\] let filename = "Airpimo"/);
+ assert.match(read('scripts/stage-native.mjs'),/stagedBinName=os==='darwin'\?'Airpimo Player':binName/);
+ assert.match(read('src-tauri/src/receiver.rs'),/\#\[cfg\(target_os = "macos"\)\] let filename = "Airpimo Player"/);
  assert.match(read('src-tauri/src/receiver.rs'),/\#\[cfg\(windows\)\] let filename = "AirpimoPlayer\.exe"/);
  assert.match(read('scripts/native-engine-core.mjs'),/platform==='win32'\?'uxplay\.exe':'uxplay'/);
- assert.match(read('scripts/prune-macos-native.mjs'),/sidecar\/Airpimo/);
+ assert.match(read('scripts/prune-macos-native.mjs'),/sidecar\/Airpimo Player/);
 });
 test('Windows native pruning is called after ABI alignment, before smoke and candidate promotion',()=>{
  const src=readFileSync(resolve(import.meta.dirname,'../scripts/native-release-prepare.mjs'),'utf8');

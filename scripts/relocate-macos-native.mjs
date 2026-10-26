@@ -10,7 +10,7 @@ import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import {isMachO, parseLibraries, auditMacNative} from './audit-macos-native.mjs';
 
-function validName(name) {return /^(sidecar|gstreamer)\/[\w.+@()/-]+$/.test(name) && !name.split('/').includes('..');}
+function validName(name) {return (/^(sidecar|gstreamer)\/[\w.+@()/-]+$/.test(name) || name === 'sidecar/Airpimo Player') && !name.split('/').includes('..');}
 export function planMacRelocation(resources,{run=spawnSync, manifest}={}) {
   const root=realpathSync(resolve(resources));
   const data=manifest??JSON.parse(readFileSync(join(root,'native-manifest.json'),'utf8'));
@@ -51,7 +51,7 @@ export function planMacRelocation(resources,{run=spawnSync, manifest}={}) {
       if(name!==replacement)operations.push({type:'change',file:entry.file,path:entry.path,from:name,to:replacement});
     }
   }
-  if(!bins.some(v=>v.path==='sidecar/Airpimo'||v.path==='sidecar/uxplay')) problems.push('No Mach-O macOS receiver sidecar found');
+  if(!bins.some(v=>v.path==='sidecar/Airpimo Player'||v.path==='sidecar/uxplay')) problems.push('No Mach-O macOS receiver sidecar found');
   return {ok:problems.length===0,filesExamined:bins.length,problems,operations};
 }
 export function applyMacRelocation(resources,{run=spawnSync}={}) {

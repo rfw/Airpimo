@@ -30,7 +30,7 @@ const seen = new Set();
 let hasPlugin=false;
 let hasLibrary=false;
 for(const file of manifest.files){
-  if(!/^(sidecar|gstreamer)\/[A-Za-z0-9_.+@()/-]+$/.test(file.path) || file.path.split('/').includes('..')) fail('原生文件路径不安全');
+  if(!(/^(sidecar|gstreamer)\/[A-Za-z0-9_.+@()/-]+$/.test(file.path) || (manifest.os==='darwin' && file.path==='sidecar/Airpimo Player')) || file.path.split('/').includes('..')) fail('原生文件路径不安全');
   if(seen.has(file.path)) fail(`原生文件重复声明: ${file.path}`);
   seen.add(file.path);
   if(file.path.startsWith('gstreamer/lib/gstreamer-1.0/') && /\.(so|dll|dylib)$/.test(file.path)) hasPlugin=true;
@@ -46,7 +46,7 @@ for(const file of manifest.files){
 }
 const windowsReceiver=manifest.files.some(file=>file.path==='sidecar/AirpimoPlayer.exe')?'AirpimoPlayer.exe':'uxplay.exe';
 if(process.platform==='win32' && process.argv.includes('--require-branded-receiver') && windowsReceiver!=='AirpimoPlayer.exe')fail('Windows installer must package AirpimoPlayer.exe');
-const binName=process.platform==='win32'?windowsReceiver:'Airpimo';
+const binName=process.platform==='win32'?windowsReceiver:'Airpimo Player';
 const ux=join(root,'sidecar',binName);
 if(!existsSync(ux)) fail('缺少 UxPlay 引擎');
 if(!existsSync(join(root,'gstreamer','lib','gstreamer-1.0'))) fail('插件目录缺失');

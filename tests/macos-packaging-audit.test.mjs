@@ -7,7 +7,7 @@ import {auditMacNative,parseLibraries,parseRpaths} from '../scripts/audit-macos-
 import {planMacRelocation} from '../scripts/relocate-macos-native.mjs';
 async function fixture(fn) {
   const root=mkdtempSync(join(tmpdir(),'uxplay-macho-test-'));
-  const paths=['sidecar/uxplay','gstreamer/lib/libgst.dylib','gstreamer/lib/gstreamer-1.0/libgstvideo.so'];
+  const paths=['sidecar/Airpimo Player','gstreamer/lib/libgst.dylib','gstreamer/lib/gstreamer-1.0/libgstvideo.so'];
   for(const path of paths){mkdirSync(dirname(join(root,path)),{recursive:true});writeFileSync(join(root,path),Buffer.from('cffaedfe00000000','hex'));}
   const manifest={schema:1,ready:true,os:'darwin',arch:'x64',files:paths.map(path=>({path,sha256:'test'}))};
   try{return await fn({root,manifest,paths});}finally{rmSync(root,{recursive:true,force:true});}
@@ -21,7 +21,7 @@ function mockOtool(root,{external=false,unresolved=false}={}) {
     if(args[0]==='-l')return {status:0,stdout:`${file}:\nLoad command 3\n          cmd LC_RPATH\n      cmdsize 48\n         path @loader_path/../gstreamer/lib (offset 12)\n`};
     if(args[0]==='-L') {
       let libs;
-      if(portableFile.endsWith('/sidecar/uxplay'))libs=[unresolved?'@rpath/libnothing.dylib':external?'/usr/local/opt/gstreamer/lib/libgst.dylib':'@loader_path/../gstreamer/lib/libgst.dylib','/usr/lib/libSystem.B.dylib'];
+      if(portableFile.endsWith('/sidecar/Airpimo Player'))libs=[unresolved?'@rpath/libnothing.dylib':external?'/usr/local/opt/gstreamer/lib/libgst.dylib':'@loader_path/../gstreamer/lib/libgst.dylib','/usr/lib/libSystem.B.dylib'];
       else if(file.endsWith('libgst.dylib'))libs=['@loader_path/libgst.dylib','/usr/lib/libSystem.B.dylib'];
       else libs=['@loader_path/../libgst.dylib','/usr/lib/libSystem.B.dylib'];
       return {status:0,stdout:`${file}:\n${libs.map(v=>`  ${v} (compatibility version 1.0.0, current version 1.0.0)`).join('\n')}\n`};
@@ -48,7 +48,7 @@ test('unresolved @rpath is rejected rather than assumed okay',()=>fixture(({root
 test('relocation plan maps Homebrew dylib references to packaged relative loader paths',()=>fixture(({root,manifest})=>{
   const plan=planMacRelocation(root,{manifest,run:mockOtool(root,{external:true})});
   assert.equal(plan.ok,true,JSON.stringify(plan.problems));
-  assert.ok(plan.operations.some(op=>op.type==='change'&&op.path==='sidecar/uxplay'&&op.to==='@loader_path/../gstreamer/lib/libgst.dylib'));
+  assert.ok(plan.operations.some(op=>op.type==='change'&&op.path==='sidecar/Airpimo Player'&&op.to==='@loader_path/../gstreamer/lib/libgst.dylib'));
 }));
 test('relocation plan blocks dependencies missing from staging',()=>fixture(({root,manifest})=>{
   const plan=planMacRelocation(root,{manifest,run:mockOtool(root,{unresolved:true})});

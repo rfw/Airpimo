@@ -38,7 +38,7 @@ export function auditMacNative(resourceDir,{run=spawnSync, manifest}={}) {
   const allowed=new Set();
   for(const item of data.files??[]) {
     const name=item.path;
-    if(typeof name!=='string' || !/^(sidecar|gstreamer)\/[\w.+@()/-]+$/.test(name) || name.split('/').includes('..')) {
+    if(typeof name!=='string' || !(/^(sidecar|gstreamer)\/[\w.+@()/-]+$/.test(name) || name === 'sidecar/Airpimo Player') || name.split('/').includes('..')) {
       problems.push(`Invalid manifest entry: ${String(name)}`);continue;
     }
     const file=join(root,name);
@@ -48,7 +48,7 @@ export function auditMacNative(resourceDir,{run=spawnSync, manifest}={}) {
     allowed.add(real);
     if(isMachO(real)) entries.push({name,file:real});
   }
-  const stagedName=data.files?.some(f=>f.path==='sidecar/Airpimo')?'Airpimo':'uxplay';
+  const stagedName=data.files?.some(f=>f.path==='sidecar/Airpimo Player')?'Airpimo Player':'uxplay';
   const executable=realpathSync(join(root,'sidecar',stagedName));
   if(!entries.some(v=>v.file===executable)) problems.push('Missing Mach-O UxPlay executable');
   const scanned=new Map();

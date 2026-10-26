@@ -3,7 +3,7 @@
 //! Operates only on visible top-level windows owned by this exact child PID.
 #![cfg(windows)]
 use std::{mem::size_of, os::windows::ffi::OsStrExt, thread, time::{Duration, Instant}};
-use std::ffi::{OsStr, c_void};
+use std::ffi::OsStr;
 
 type Hwnd = isize;
 type Handle = isize;
@@ -101,68 +101,6 @@ fn set_title_and_maximize_button(hwnd: Hwnd) {
         }
     }
 }
-// Using WS_EX_TOOLWINDOW to suppress Explorer's icon also removes the
-// standard maximize button. Use the Windows 7-compatible ITaskbarList COM
-// interface instead so the normal caption's maximize control is preserved.
-#[repr(C)]
-struct Guid { d1: u32, d2: u16, d3: u16, d4: [u8; 8] }
-const CLSID_TASKBAR_LIST: Guid = Guid { d1: 0x56fdf344, d2: 0xfd6d, d3: 0x11d0,
-    d4: [0x95, 0x8a, 0x00, 0x60, 0x97, 0xc9, 0xa0, 0x90] };
-const IID_ITASKBAR_LIST: Guid = Guid { d1: 0x56fdf342, d2: 0xfd6d, d3: 0x11d0,
-    d4: [0x95, 0x8a, 0x00, 0x60, 0x97, 0xc9, 0xa0, 0x90] };
-#[repr(C)]
-struct ITaskbarList { vtbl: *const ITaskbarListVtbl }
-#[repr(C)]
-struct ITaskbarListVtbl {
-    query_interface: unsafe extern "system" fn(*mut ITaskbarList, *const Guid, *mut *mut c_void) -> i32,
-    add_ref: unsafe extern "system" fn(*mut ITaskbarList) -> u32,
-    release: unsafe extern "system" fn(*mut ITaskbarList) -> u32,
-    hr_init: unsafe extern "system" fn(*mut ITaskbarList) -> i32,
-    add_tab: unsafe extern "system" fn(*mut ITaskbarList, Hwnd) -> i32,
-    delete_tab: unsafe extern "system" fn(*mut ITaskbarList, Hwnd) -> i32,
-    activate_tab: unsafe extern "system" fn(*mut ITaskbarList, Hwnd) -> i32,
-    set_active_alt: unsafe extern "system" fn(*mut ITaskbarList, Hwnd) -> i32,
-}
-#[link(name = "ole32")]
-extern "system" {
-    fn CoInitializeEx(reserved: *mut c_void, flags: u32) -> i32;
-    fn CoCreateInstance(clsid: *const Guid, outer: *mut c_void, context: u32,
-        iid: *const Guid, result: *mut *mut c_void) -> i32;
-    fn CoUninitialize();
-}
-struct Taskbar { interface: *mut ITaskbarList, initialized: bool }
-impl Taskbar {
-    fn new() -> Self {
-        unsafe {
-            let initialized = CoInitializeEx(std::ptr::null_mut(), 0x2) >= 0;
-            let mut interface: *mut ITaskbarList = std::ptr::null_mut();
-            if initialized {
-                let mut raw: *mut c_void = std::ptr::null_mut();
-                if CoCreateInstance(&CLSID_TASKBAR_LIST, std::ptr::null_mut(), 1,
-                    &IID_ITASKBAR_LIST, &mut raw) >= 0 && !raw.is_null() {
-                    let candidate = raw as *mut ITaskbarList;
-                    if ((*(*candidate).vtbl).hr_init)(candidate) >= 0 {
-                        interface = candidate;
-                    } else { ((*(*candidate).vtbl).release)(candidate); }
-                }
-            }
-            Self { interface, initialized }
-        }
-    }
-    fn suppress_child_taskbar_button(&self, hwnd: Hwnd) {
-        if self.interface.is_null() { return; }
-        unsafe { ((*(*self.interface).vtbl).delete_tab)(self.interface, hwnd); }
-    }
-}
-impl Drop for Taskbar {
-    fn drop(&mut self) {
-        unsafe {
-            if !self.interface.is_null() { ((*(*self.interface).vtbl).release)(self.interface); }
-            if self.initialized { CoUninitialize(); }
-        }
-    }
-}
-
 fn toggle(hwnd: Hwnd, current: &mut Option<Windowed>) {
     unsafe {
         if let Some(previous) = current.take() {
@@ -207,7 +145,6 @@ pub fn watch(child_pid: u32, mut on_closed: impl FnMut() -> bool + Send + 'stati
     thread::spawn(move || {
         let process = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, 0, child_pid) };
         if process == 0 { return; }
-        let taskbar = Taskbar::new();
         let mut hwnd: Hwnd = 0;
         let mut saw_video_window = false;
         let mut window_missing_since: Option<Instant> = None;
@@ -224,7 +161,6 @@ pub fn watch(child_pid: u32, mut on_closed: impl FnMut() -> bool + Send + 'stati
                 fullscreen = None;
                 last_click = None;
                 last_title = Instant::now() - Duration::from_secs(5);
-                if hwnd != 0 { taskbar.suppress_child_taskbar_button(hwnd); }
             }
             if hwnd != 0 && unsafe { IsWindow(hwnd) } != 0 {
                 saw_video_window = true;
@@ -246,9 +182,6 @@ pub fn watch(child_pid: u32, mut on_closed: impl FnMut() -> bool + Send + 'stati
             }
             if fullscreen.is_none() && last_title.elapsed() >= Duration::from_millis(1200) {
                 set_title_and_maximize_button(hwnd);
-                // Explorer can add a taskbar entry after initial discovery
-                // or after a shell restart. Refresh alongside the caption.
-                taskbar.suppress_child_taskbar_button(hwnd);
                 last_title = Instant::now();
             }
             let active = unsafe { GetForegroundWindow() } == hwnd;
