@@ -77,9 +77,10 @@ test('tray feedback remains in a fixed-height accessible row and success stays r
   assert.match(dialog, /role=\{trayError \? "alert" : "status"\}/);
   assert.match(dialog, /aria-atomic="true"/);
   assert.match(dialog, /min-h-\[15px\]/);
-  assert.match(dialog, /trayPersisted[\s\S]*?t\("设置已保存，无需点击保存设置。"\)/);
+  assert.match(dialog, /trayPersisted[\s\S]*?t\("设置已保存"\)/);
   assert.doesNotMatch(dialog, /\{traySaving && <p role="status"/);
-  assert.match(translations, /'设置已保存，无需点击保存设置。': 'Saved\./);
+  assert.match(translations, /'设置已保存': 'Saved'/);
+  assert.doesNotMatch(dialog, /此选项自动保存|无需点击保存设置/);
 });
 
 test('macOS and Windows exit paths enqueue a native app-level exit after close dispatch', () => {

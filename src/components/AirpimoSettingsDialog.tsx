@@ -1,6 +1,6 @@
 import { useI18n } from "../lib/i18n-react";
 import { useState, type Dispatch, type SetStateAction } from "react";
-import { AlertCircle, CheckCircle2, Download, ExternalLink, Github, RefreshCw, X } from "lucide-react";
+import { AlertCircle, Download, ExternalLink, Github, RefreshCw, X } from "lucide-react";
 import airpimoIcon from "../../src-tauri/icons/128x128.png";
 import { brand } from "../brand";
 import { Button } from "./ui/button";
@@ -250,8 +250,8 @@ export function AirpimoSettingsDialog({
                     : traySaving
                         ? t("正在保存托盘设置…")
                         : trayPersisted
-                            ? t("设置已保存，无需点击保存设置。")
-                            : t("此选项自动保存，无需点击保存设置。")}
+                            ? t("设置已保存")
+                            : null}
               </p>
 
               <label htmlFor="showAdvanced" className="flex cursor-pointer items-center justify-between border-b border-border px-px py-2">
@@ -395,54 +395,49 @@ export function AirpimoSettingsDialog({
 
                 <div className="rounded-xl border border-border bg-card p-3.5 shadow-sm">
                   <h3 className="text-xs font-semibold">{t("软件更新")}</h3>
-                  <p className="mt-1 text-[10px] leading-normal text-muted-foreground">
-                    {t("检查新版本并从 GitHub Release 获取安装包。")}
-                  </p>
-                  <div
-                      className={`mt-3 flex items-start gap-2 rounded-lg bg-muted/70 px-2.5 py-2.5 text-[11px] leading-[1.5] ${updateResult?.kind === "error" ? "text-destructive" : updateResult?.kind === "available" ? "text-foreground" : "text-muted-foreground"}`}
-                      role="status"
-                      aria-live="polite"
-                      aria-busy={updateChecking}
-                  >
-                    {updateResult?.kind === "error" ? (
-                        <AlertCircle size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
-                    ) : updateResult?.kind === "latest" ? (
-                        <CheckCircle2 size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
-                    ) : (
-                        <RefreshCw size={15} className={`mt-0.5 shrink-0 ${updateChecking ? "motion-safe:animate-spin" : ""}`} aria-hidden="true" />
-                    )}
-                    <span className="min-w-0 break-words">
-                      {updateChecking
-                          ? t("正在检查更新…")
-                          : !updateResult
-                              ? t("尚未检查更新")
-                              : updateResult.kind === "available"
-                                  ? `${t("发现新版本")} ${updateResult.latest}`
-                                  : updateResult.kind === "latest"
-                                      ? `${t("已是最新版本")} (v${updateResult.current})`
-                                      : t(updateResult.message)}
-                    </span>
-                  </div>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => void runUpdateCheck()}
-                        disabled={updateChecking}
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                    <div
+                        className={`flex min-w-0 flex-[1_1_160px] items-center gap-1.5 text-[11px] leading-[1.5] ${updateResult?.kind === "error" ? "text-destructive" : updateResult?.kind === "available" ? "text-foreground" : "text-muted-foreground"}`}
+                        role="status"
+                        aria-live="polite"
+                        aria-busy={updateChecking}
                     >
-                      <RefreshCw size={13} aria-hidden="true" className={`mr-1.5 ${updateChecking ? "motion-safe:animate-spin" : ""}`} />
-                      {updateChecking ? t("检查中…") : t("检查更新")}
-                    </Button>
-                    {updateResult?.kind === "available" && (
-                        <Button
-                            type="button"
-                            onClick={() => void openRelease()}
-                            disabled={releaseOpening}
-                        >
-                          <Download size={13} className="mr-1.5" aria-hidden="true" />
-                          {releaseOpening ? t("打开中…") : t("下载")}
-                        </Button>
-                    )}
+                      {updateResult?.kind === "error" && (
+                          <AlertCircle size={15} className="shrink-0" aria-hidden="true" />
+                      )}
+                      <span className="min-w-0 break-words">
+                        {updateChecking
+                            ? t("正在检查更新…")
+                            : !updateResult
+                                ? t("尚未检查更新")
+                                : updateResult.kind === "available"
+                                    ? `${t("发现新版本")} ${updateResult.latest}`
+                                    : updateResult.kind === "latest"
+                                        ? `${t("已是最新版本")} (v${updateResult.current})`
+                                        : t(updateResult.message)}
+                      </span>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => void runUpdateCheck()}
+                          disabled={updateChecking}
+                      >
+                        <RefreshCw size={13} aria-hidden="true" className={`mr-1.5 ${updateChecking ? "motion-safe:animate-spin" : ""}`} />
+                        {updateChecking ? t("检查中…") : t("检查更新")}
+                      </Button>
+                      {updateResult?.kind === "available" && (
+                          <Button
+                              type="button"
+                              onClick={() => void openRelease()}
+                              disabled={releaseOpening}
+                          >
+                            <Download size={13} className="mr-1.5" aria-hidden="true" />
+                            {releaseOpening ? t("打开中…") : t("下载")}
+                          </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
 

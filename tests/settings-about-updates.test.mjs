@@ -22,6 +22,9 @@ test('About preserves current version, update status cases, check and download c
     assert.ok(panel.includes(token), `missing status: ${token}`);
   }
   assert.match(panel, /role="status"[\s\S]*?aria-live="polite"/);
+  assert.match(panel, /flex flex-wrap items-center justify-between gap-x-3 gap-y-2/);
+  assert.match(panel, /role="status"[\s\S]*?<\/div>\s*<div className="flex shrink-0 items-center gap-2">[\s\S]*?runUpdateCheck/);
+  assert.doesNotMatch(panel, /CheckCircle2|检查新版本并从 GitHub Release 获取安装包。/);
   assert.match(panel, /onClick=\{\(\) => void runUpdateCheck\(\)\}[\s\S]*?disabled=\{updateChecking\}/);
   assert.match(panel, /updateResult\?\.kind === "available" && \([\s\S]*?onClick=\{\(\) => void openRelease\(\)\}[\s\S]*?disabled=\{releaseOpening\}/);
   assert.match(app, /checkAtStartup\(brand\.version\)/);
@@ -42,7 +45,6 @@ test('About update strings are translated without changing the shared update pro
   for (const [zh, en] of [
     ['软件更新', 'Software updates'],
     ['项目信息', 'Project information'],
-    ['检查新版本并从 GitHub Release 获取安装包。', 'Check for a new version and get installers from GitHub Releases.'],
     ['检查更新', 'Check for updates'],
     ['已是最新版本', 'You are up to date'],
   ]) assert.equal(translate(zh, 'en'), en);
