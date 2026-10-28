@@ -54,9 +54,8 @@ export function planAirpimoBrand(root = defaultRoot) {
     }
     lock.name = 'airpimo';
     lock.packages[''].name = 'airpimo';
-    if (lock.version !== pkg.version || lock.packages[''].version !== pkg.version) {
-      throw new Error('package-lock.json version mismatch; synchronize npm lock before rebranding');
-    }
+    // The lockfile is dependency metadata, not a project-version authority.
+    // Keep the root package name check, but do not gate rebranding on lockfile versions.
     return src.replace(/^(\s*"name"\s*:\s*")uxplay-desktop("\s*,)/gm, '$1airpimo$2');
   });
 

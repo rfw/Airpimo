@@ -15,29 +15,37 @@ function fixture(callback,{packageVersion='0.1.5',lockVersion='0.1.5',cargoPacka
   writeFileSync(join(tauri,'Cargo.lock'),`version = 3\n\n[[package]]\nname = "serde"\nversion = "1.0.219"\n\n[[package]]\nname = "airpimo"\nversion = "0.1.4"\ndependencies = [\n "serde",\n]\n`);
   try{return callback(root);}finally{rmSync(root,{recursive:true,force:true});}
 }
-test('version synchronization updates only three project metadata files, preserving dependency versions',()=>fixture(root=>{
+test('version synchronization updates only Tauri and Cargo.toml metadata, leaving both lockfiles untouched',()=>fixture(root=>{
   const before=syncProjectVersion(root);
   assert.equal(before.applied,false);
-  assert.equal(before.files.length,3);
+  assert.equal(before.files.length,2);
   const cargo=join(root,'src-tauri','Cargo.toml');
+  const beforeNpmLock=readFileSync(join(root,'package-lock.json'),'utf8');
+  const beforeCargoLock=readFileSync(join(root,'src-tauri','Cargo.lock'),'utf8');
   assert.match(readFileSync(cargo,'utf8'),/version = "0\.1\.4"/);
   const result=syncProjectVersion(root,{apply:true});
   assert.equal(result.version,'0.1.5');
-  assert.equal(result.files.length,3);
+  assert.equal(result.files.length,2);
   assert.equal(syncProjectVersion(root).files.length,0);
   assert.equal(JSON.parse(readFileSync(join(root,'src-tauri','tauri.conf.json'))).version,'0.1.5');
   assert.match(readFileSync(cargo,'utf8'),/version = "0\.1\.5"/);
   assert.match(readFileSync(cargo,'utf8'),/serde = "1\.0\.219"/);
-  const lock=readFileSync(join(root,'src-tauri','Cargo.lock'),'utf8');
-  assert.match(lock,/name = "airpimo"\nversion = "0\.1\.5"/);
-  assert.match(lock,/name = "serde"\nversion = "1\.0\.219"/);
+  assert.equal(readFileSync(join(root,'package-lock.json'),'utf8'),beforeNpmLock);
+  assert.equal(readFileSync(join(root,'src-tauri','Cargo.lock'),'utf8'),beforeCargoLock);
 }));
 
-test('version sync fails without modifying Tauri or Cargo when npm lock is inconsistent',()=>fixture(root=>{
-  const tauri=join(root,'src-tauri','tauri.conf.json'), original=readFileSync(tauri,'utf8');
-  assert.throws(()=>syncProjectVersion(root,{apply:true}),/package-lock.json differs/);
-  assert.equal(readFileSync(tauri,'utf8'),original);
-},{lockVersion:'0.1.4'}));
+test('version sync accepts mismatched npm and Cargo lockfile versions without rewriting either',()=>fixture(root=>{
+  const npmLock=join(root,'package-lock.json');
+  const cargoLock=join(root,'src-tauri','Cargo.lock');
+  const originalNpm=readFileSync(npmLock,'utf8');
+  const originalCargo=readFileSync(cargoLock,'utf8');
+  assert.equal(syncProjectVersion(root).files.length,2);
+  const result=syncProjectVersion(root,{apply:true});
+  assert.equal(result.files.length,2);
+  assert.equal(syncProjectVersion(root).files.length,0);
+  assert.equal(readFileSync(npmLock,'utf8'),originalNpm);
+  assert.equal(readFileSync(cargoLock,'utf8'),originalCargo);
+},{lockVersion:'0.0.1'}));
 
 test('version sync fails without partial changes for wrong Cargo package',()=>fixture(root=>{
   const tauri=join(root,'src-tauri','tauri.conf.json'), original=readFileSync(tauri,'utf8');
@@ -49,14 +57,14 @@ test('version sync keeps Tauri package.json reference while updating Cargo metad
   const tauri=join(root,'src-tauri','tauri.conf.json');
   const original=readFileSync(tauri,'utf8');
   const plan=syncProjectVersion(root);
-  assert.equal(plan.files.length,2);
+  assert.equal(plan.files.length,1);
   const result=syncProjectVersion(root,{apply:true});
-  assert.equal(result.files.length,2);
+  assert.equal(result.files.length,1);
   assert.equal(readFileSync(tauri,'utf8'),original);
   assert.equal(JSON.parse(readFileSync(tauri,'utf8')).version,'../package.json');
   assert.equal(syncProjectVersion(root).files.length,0);
   assert.match(readFileSync(join(root,'src-tauri','Cargo.toml'),'utf8'),/version = "0\.1\.5"/);
-  assert.match(readFileSync(join(root,'src-tauri','Cargo.lock'),'utf8'),/name = "airpimo"\nversion = "0\.1\.5"/);
+  assert.match(readFileSync(join(root,'src-tauri','Cargo.lock'),'utf8'),/name = "airpimo"\nversion = "0\.1\.4"/);
 },{tauriVersion:'../package.json'}));
 
 test('version sync fails closed on an unexpected Tauri reference',()=>fixture(root=>{

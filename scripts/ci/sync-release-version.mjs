@@ -17,10 +17,8 @@ function planVersionSync(root=projectRoot){
   if(manifest.name!=='airpimo'||!versionPattern.test(version??'')){
     throw new Error(`BLOCKED: invalid package name or version in package.json: ${manifest.name} ${version}`);
   }
-  const npmLock=JSON.parse(readFileSync(join(root,'package-lock.json'),'utf8'));
-  if(npmLock.name!==manifest.name||npmLock.version!==version||npmLock.packages?.['']?.version!==version){
-    throw new Error('BLOCKED: package-lock.json differs from package.json; run npm install --package-lock-only --ignore-scripts');
-  }
+  // package-lock.json and Cargo.lock are dependency resolver outputs.
+  // Their project-version fields are intentionally not checked or rewritten.
   const changes=[];
   const tauriPath=join(root,'src-tauri','tauri.conf.json');
   const tauri=readFileSync(tauriPath,'utf8');
@@ -48,11 +46,6 @@ function planVersionSync(root=projectRoot){
   const nextPackage=replaceExactlyOnce(cargoMatch[1],/^version\s*=\s*"([^"]+)"/m,()=>`version = "${version}"`,'Cargo.toml [package]');
   changes.push({path:cargoPath,before:cargo,after:cargo.replace(cargoMatch[0],`[package]${nextPackage}`)});
 
-  const lockPath=join(root,'src-tauri','Cargo.lock');
-  const lock=readFileSync(lockPath,'utf8');
-  const lockPattern=/(^\[\[package\]\]\s*\r?\nname\s*=\s*"airpimo"\s*\r?\nversion\s*=\s*")([^"]+)(")/m;
-  const nextLock=replaceExactlyOnce(lock,lockPattern,(_whole,start,_current,end)=>start+version+end,'Cargo.lock [[package]] airpimo');
-  changes.push({path:lockPath,before:lock,after:nextLock});
   return {version,changes};
 }
 export function syncProjectVersion(root=projectRoot,{apply=false}={}){

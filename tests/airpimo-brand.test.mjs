@@ -26,8 +26,7 @@ test('Airpimo release package, bundle identifier and Rust crate agree',()=>{
     ? json('package.json').version
     : config.version;
   assert.equal(tauriVersion,pkg.version);
-  assert.equal(lock.version,pkg.version,'package-lock.json top-level version must match package.json');
-  assert.equal(lock.packages[''].version,pkg.version,'package-lock.json root package version must match package.json');
+  // Lockfile project-version fields are intentionally excluded from brand consistency.
 });
 
 test('Airpimo UI, configurable receiver, diagnostics and settings migration are consistent',()=>{
