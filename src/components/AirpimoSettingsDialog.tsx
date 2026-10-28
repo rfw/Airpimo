@@ -254,7 +254,7 @@ export function AirpimoSettingsDialog({
                             : null}
               </p>
 
-              <label htmlFor="showAdvanced" className="flex cursor-pointer items-center justify-between border-b border-border px-px py-2">
+              <label htmlFor="showAdvanced" className="flex cursor-pointer items-center justify-between px-px py-2">
                 <span className="text-xs font-semibold">{t('高级功能')}</span>
                 <input
                     id="showAdvanced"
@@ -304,11 +304,14 @@ export function AirpimoSettingsDialog({
                 <p className="my-2 text-[11px] leading-normal text-muted-foreground">
                   {t("选择界面语言，切换后立即生效。")}
                 </p>
-                <div className="mt-2.5 grid grid-cols-3 gap-[3px] rounded-lg border border-border bg-muted p-[3px]" role="radiogroup" aria-labelledby="airpimo-interface-language-label">
+                <div className="mt-2.5 grid grid-cols-2 gap-[3px] rounded-lg border border-border bg-muted p-[3px]" role="radiogroup" aria-labelledby="airpimo-interface-language-label">
                   {([
                     ["system", t("跟随系统")],
                     ["zh-CN", "简体中文"],
                     ["en", "English"],
+                    ["zh-TW", "繁體中文"],
+                    ["ja-JP", "日本語"],
+                    ["ko-KR", "한국어"],
                   ] as const).map(([value, label]) => (
                     <label className="group relative min-w-0 cursor-pointer" key={value}>
                       <input

@@ -62,11 +62,7 @@
           "SimpChinese",
           "TradChinese",
           "Japanese",
-          "Korean",
-          "French",
-          "German",
-          "Spanish",
-          "Russian"
+          "Korean"
         ]
       },
       "webviewInstallMode": {

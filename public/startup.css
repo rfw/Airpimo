@@ -13,5 +13,13 @@ html.dark #airpimo-startup strong { color: #d9dee6; }
 @keyframes airpimo-wheel { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { #airpimo-startup .airpimo-loading-wheel { animation: none; } }
 
-html[lang="en"] .airpimo-startup-zh { display: none; }
-html[lang="zh-CN"] .airpimo-startup-en { display: none; }
+#airpimo-startup .airpimo-startup-zh,
+#airpimo-startup .airpimo-startup-en,
+#airpimo-startup .airpimo-startup-zh-tw,
+#airpimo-startup .airpimo-startup-ja,
+#airpimo-startup .airpimo-startup-ko { display: none; }
+html[lang="zh-CN"] #airpimo-startup .airpimo-startup-zh { display: block; }
+html[lang="en"] #airpimo-startup .airpimo-startup-en { display: block; }
+html[lang="zh-TW"] #airpimo-startup .airpimo-startup-zh-tw { display: block; }
+html[lang="ja-JP"] #airpimo-startup .airpimo-startup-ja { display: block; }
+html[lang="ko-KR"] #airpimo-startup .airpimo-startup-ko { display: block; }

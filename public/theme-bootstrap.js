@@ -11,8 +11,13 @@
   var choice = 'system';
   try { choice = localStorage.getItem('airpimo.language') || 'system'; } catch (_) {}
   var preferred = (typeof navigator !== 'undefined' ? (navigator.languages && navigator.languages.length ? navigator.languages[0] : navigator.language) : '') || '';
-  document.documentElement.lang = choice === 'zh-CN' || choice === 'en'
-    ? choice : /^zh(?:-|$)/i.test(preferred) ? 'zh-CN' : 'en';
+  var systemLocale = preferred.trim().replace(/_/g, '-').toLowerCase();
+  var systemLanguage = /^zh-(tw|hk|mo|hant)(-|$)/.test(systemLocale) ? 'zh-TW'
+    : /^zh(-|$)/.test(systemLocale) ? 'zh-CN'
+    : /^ja(-|$)/.test(systemLocale) ? 'ja-JP'
+    : /^ko(-|$)/.test(systemLocale) ? 'ko-KR' : 'en';
+  document.documentElement.lang = ['zh-CN', 'zh-TW', 'en', 'ja-JP', 'ko-KR'].indexOf(choice) !== -1
+    ? choice : systemLanguage;
   if (dark) document.documentElement.classList.add('dark');
   document.documentElement.style.backgroundColor = dark ? '#1b1e23' : '#ffffff';
   document.documentElement.style.colorScheme = dark ? 'dark' : 'light';

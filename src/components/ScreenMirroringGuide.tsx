@@ -17,7 +17,7 @@ export function ScreenMirroringGuide({
 
     return (
         <div className="w-full rounded-2xl border border-gray-100 dark:border-gray-700/50 px-2 py-2">
-            <div className="grid grid-cols-[minmax(0,1fr)_12px_minmax(0,0.8fr)_12px_minmax(0,1.5fr)] items-center gap-1">
+            <div className="grid grid-cols-[minmax(0,1fr)_12px_minmax(0,0.8fr)_12px_minmax(0,1fr)] items-center gap-1">
                 {/* 第一步：打开控制中心 */}
                 <div className="flex min-w-0 flex-col items-center gap-1">
                     <div className={iconWrapperClass}>

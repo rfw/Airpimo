@@ -13,11 +13,11 @@ const {
 test('language preference, manual priority, unsupported locale fallback', () => {
   assert.equal(LANGUAGE_STORAGE_KEY, 'airpimo.language');
   for (const x of [null, undefined, '', 'auto', 'fr', {}, 7]) assert.equal(parseLanguageChoice(x), 'system');
-  for (const x of ['system', 'en', 'zh-CN']) assert.equal(parseLanguageChoice(x), x);
+  for (const x of ['system', 'en', 'zh-CN', 'zh-TW', 'ja-JP', 'ko-KR']) assert.equal(parseLanguageChoice(x), x);
   assert.equal(systemLanguage(['zh-CN', 'en-US']), 'zh-CN');
-  assert.equal(systemLanguage(['zh-TW', 'en']), 'zh-CN');
-  assert.equal(systemLanguage(['ZH-hk']), 'zh-CN');
-  assert.equal(systemLanguage(['ja-JP', 'zh-CN']), 'en');
+  assert.equal(systemLanguage(['zh-TW', 'en']), 'zh-TW');
+  assert.equal(systemLanguage(['ZH-hk']), 'zh-TW');
+  assert.equal(systemLanguage(['ja-JP', 'zh-CN']), 'ja-JP');
   assert.equal(systemLanguage([]), 'en');
   assert.equal(detectSystemLanguage({ languages: [], language: 'zh-CN' }), 'zh-CN');
   assert.equal(detectSystemLanguage({ languages: ['fr-FR'], language: 'zh-CN' }), 'en');
@@ -79,10 +79,10 @@ test('synchronous bootstrap selects html language before React paint', () => {
   assert.equal(simulateBootstrap({ languages: ['fr-FR'] }).lang, 'en');
   assert.equal(simulateBootstrap({ languages: ['zh-CN'], choice: 'en' }).lang, 'en');
   assert.equal(simulateBootstrap({ languages: ['en'], choice: 'zh-CN' }).lang, 'zh-CN');
-  assert.equal(simulateBootstrap({ languages: ['ja'], locked: true }).lang, 'en');
+  assert.equal(simulateBootstrap({ languages: ['ja'], locked: true }).lang, 'ja-JP');
   assert.equal(simulateBootstrap({ languages: ['zh'], dark: true }).style.colorScheme, 'dark');
   assert.match(read('index.html'), /<script src="\/theme-bootstrap\.js"><\/script>[\s\S]*?<div id="airpimo-startup"/);
-  assert.match(read('public/startup.css'), /html\[lang="en"\] \.airpimo-startup-zh \{ display: none; \}/);
+  assert.match(read('public/startup.css'), /html\[lang="en"\] #airpimo-startup \.airpimo-startup-en \{ display: block; \}/);
 });
 
 test('language selector lives in the Interface panel and never saves to receiver', () => {
@@ -92,7 +92,7 @@ test('language selector lives in the Interface panel and never saves to receiver
   assert.match(settings, /\["theme", t\("界面"\)\]/);
   assert.match(settings, /id="airpimo-panel-theme"[\s\S]*?id="airpimo-interface-language-label"[\s\S]*?id="airpimo-appearance-theme-label"/);
   assert.match(settings, /name="interfaceLanguage"[\s\S]*?checked=\{choice === value\}[\s\S]*?setChoice\(value\)/);
-  assert.match(settings, /\["system", t\("跟随系统"\)\][\s\S]*?\["zh-CN", "简体中文"\][\s\S]*?\["en", "English"\]/);
+  assert.match(settings, /\["system", t\("跟随系统"\)\][\s\S]*?\["zh-CN", "简体中文"\][\s\S]*?\["en", "English"\][\s\S]*?\["zh-TW", "繁體中文"\][\s\S]*?\["ja-JP", "日本語"\][\s\S]*?\["ko-KR", "한국어"\]/);
   assert.match(context, /useState<LanguageChoice>\(\(\) => \{/);
   assert.match(context, /return readLanguageChoice\(window\.localStorage\)/);
   assert.match(context, /localStorage\.setItem\(LANGUAGE_STORAGE_KEY, value\)/);

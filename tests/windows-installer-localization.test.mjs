@@ -10,10 +10,9 @@ const win7=JSON.parse(read('src-tauri/tauri.win7.conf.json'));
 
 // Both packaging entry points inherit shared languages from tauri.conf.json.
 // The Win7 override must not repeat these fields or change platform runtimes.
-test('Win7 inherits shared nine-language NSIS settings while preserving separate runtimes',()=>{
+test('Win7 inherits shared five-language NSIS settings while preserving separate runtimes',()=>{
   assert.deepEqual(base.bundle.windows.nsis.languages,[
     'English','SimpChinese','TradChinese','Japanese','Korean',
-    'French','German','Spanish','Russian',
   ]);
   assert.equal(base.bundle.windows.nsis.displayLanguageSelector,false);
   assert.equal(Object.hasOwn(win7.bundle.windows.nsis,'languages'),false);
@@ -38,7 +37,7 @@ test('localized warnings in both installer hooks, without altering the process-k
   assert.match(hooks,/!macro NSIS_HOOK_PREUNINSTALL/);
 });
 
-test('pinned NSIS template emits bilingual messages after languages, and old cache is invalidated',()=>{
+test('pinned NSIS template emits five-language messages after languages, and old cache is invalidated',()=>{
   const sample=`!include "utils.nsh"
 !insertmacro CheckIfAppIsRunning
   ; Compare this installar version with the existing installation
@@ -103,12 +102,13 @@ FunctionEnd
   assert.match(SIGNATURE,/INSTALLER_V10/);
   assert.ok(generated.indexOf('!insertmacro MUI_LANGUAGE') < generated.indexOf('LangString airpimoCleanupCreateError'));
   for(const name of ['CreateError','WriteError','LocationError','ProcessError']){
-    for(const lang of ['ENGLISH','SIMPCHINESE']){
+    for(const lang of ['ENGLISH','SIMPCHINESE','TRADCHINESE','JAPANESE','KOREAN']){
       assert.match(generated,new RegExp('LangString airpimoCleanup'+name+' \\${LANG_'+lang+'}'));
     }
   }
   assert.match(generated,/无法停止/);
   assert.match(generated,/LangString airpimoPreparingUninstall \$\{LANG_ENGLISH\}/);
   assert.match(generated,/LangString airpimoPreparingUninstall \$\{LANG_SIMPCHINESE\}/);
+  for (const lang of ['TRADCHINESE', 'JAPANESE', 'KOREAN']) assert.match(generated, new RegExp('LangString airpimoPreparingUninstall \\$\\{LANG_' + lang + '\\}'));
   assert.throws(()=>customizeNsis(sample.replace('{{#each language_files}}','{{#each broken_language_files}}')),/template drift: localized cleanup messages/);
 });
